@@ -1,0 +1,188 @@
+import {presentSavedPage} from './fog-of-war-presenter'
+import {createFogOfWarCache} from './fog-of-war-cache'
+
+export function installFogOfWarCoordinator(liveSocket, build, {transition = update => update()} = {}) {
+  const cache = createFogOfWarCache(build)
+  const subscribers = new Set()
+  const devTools = new Set()
+  let lastStatus = null
+  cache.protect(location.pathname)
+  window.addEventListener('phx:page-loading-stop', () => cache.protect(location.pathname))
+  let paused = false
+  let unavailable = false
+  let everOpened = false
+  const offline = () => paused || unavailable
+  let snapshotMode = false
+  let message = ''
+  let outlet = null
+  let displayedURL = location.href
+  const setText = (id, text) => {
+    const el = document.getElementById(id)
+    if (el && el.textContent !== text) el.textContent = text
+  }
+  // Idempotent writes: our class observer also sees these styling updates.
+  const setClass = (el, name, enabled) => {
+    if (el.classList.contains(name) !== enabled) el.classList.toggle(name, enabled)
+  }
+  const refreshNavigationStyles = () => {
+    setClass(document.documentElement, 'fow-offline', offline())
+    for (const container of document.querySelectorAll('.fow-nav')) {
+      const links = container.matches('a[href]') ? [container] : [...container.querySelectorAll('a[href]')]
+      const destination = container.dataset.fogOfWarTo
+      const uncached = destination ? !cache.find(new URL(destination, location.href)) : links.some(link => {
+        try { return !cache.find(new URL(link.href)) } catch (_) { return true }
+      })
+      setClass(container, 'fow-nav-uncached', uncached)
+    }
+  }
+  const refresh = () => {
+    refreshNavigationStyles()
+    const main = document.querySelector('[data-phx-main]')
+    const ready = liveSocket.isConnected() && main?.classList.contains('phx-connected')
+    document.documentElement.dataset.connection = offline() ? 'paused' : ready ? 'live' : 'connecting'
+    const counter = document.querySelector('#persistent-counter, #shell-press')
+    if (counter) counter.disabled = offline() || !ready
+    const faultButton = document.getElementById('server-outage')
+    if (faultButton) faultButton.disabled = offline() || !ready
+    const banner = document.getElementById('fog-of-war-debug-banner')
+    if (banner) banner.hidden = !(offline() && document.body.dataset.fogOfWarDebug === 'loud')
+    setText('connection-state', paused ? 'Paused · socket closed' : unavailable ? 'Server unavailable · retrying' : ready ? 'Live · view ready' : 'Connecting…')
+    setText('connection-toggle', offline() ? 'Reconnect' : 'Pause connection')
+    setText('fow-debug-message', message)
+    const debugMessage = document.getElementById('fow-debug-message')
+    if (debugMessage) debugMessage.hidden = !message
+    setText('fog-of-war-debug-detail', paused ? 'DEBUG MODE · CONNECTION PAUSED' : 'DEBUG MODE · SERVER UNAVAILABLE')
+    setText('connection-note', message || 'Browser-side control · closes this tab’s LiveView socket.')
+    const status = {connection: offline() ? 'paused' : ready ? 'live' : 'connecting',
+      text: paused ? 'Paused' : unavailable ? 'Server unavailable' : ready ? 'Live' : 'Connecting',
+      message, snapshotMode, toggleLabel: offline() ? 'Reconnect' : 'Pause connection'}
+    if (JSON.stringify(status) !== JSON.stringify(lastStatus)) {
+      lastStatus = status
+      subscribers.forEach(fn => fn(status))
+    }
+  }
+  const lookup = url => {
+    try { return cache.find(url) } catch (_) { return null }
+  }
+  const enterSnapshotMode = () => {
+    const main = document.querySelector('[data-phx-main]')
+    if (!main) throw new Error('No live region to retire')
+    const preserved = [...devTools].map(controller => { controller.retain(); return controller.el })
+    const shell = document.getElementById('persistent-shell')
+    const page = document.createElement('main')
+    page.className = 'lab'
+    page.id = 'fog-of-war-offline-page'
+    outlet = document.createElement('div')
+    outlet.id = 'fog-of-war-offline-outlet'
+    // Preserve only the toolbar markup/local listeners, not a hidden live page.
+    // Internal adapter, pinned to LV 1.2.13: release owners/hooks/channels once.
+    // Reconnect from this mode uses a full GET, never these retired owners.
+    liveSocket.destroyAllViews()
+    if (shell) page.append(shell)
+    page.append(...preserved)
+    page.append(outlet)
+    main.replaceWith(page)
+    snapshotMode = true
+  }
+  const navigate = async (url, historyAction = 'push') => {
+    await cache.protect(url.pathname)
+    const snapshot = lookup(url)
+    if (!snapshot) {
+      await cache.protect(new URL(displayedURL).pathname)
+      message = 'This page is not available offline; it has not been saved.'
+      refresh()
+      return false
+    }
+    // Construct/validate the presentation before changing the URL.
+    await transition(() => {
+      if (!snapshotMode) enterSnapshotMode()
+      presentSavedPage(outlet, snapshot)
+    }, url)
+    if (historyAction !== 'pop') {
+      history[historyAction === 'replace' ? 'replaceState' : 'pushState']({fogOfWar: true}, '', url.href)
+    }
+    displayedURL = url.href
+    cache.protect(url.pathname)
+    message = ''
+    refresh()
+    return true
+  }
+  const toggleConnection = () => {
+    if (offline() && snapshotMode) {
+      location.assign(location.href)
+      return
+    }
+    if (unavailable) {
+      unavailable = false
+      paused = false
+      liveSocket.disconnect()
+    } else paused = !paused
+    message = ''
+    if (paused) liveSocket.disconnect(refresh)
+    else liveSocket.connect()
+    refresh()
+  }
+  document.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target : null
+    // Shadow DOM retargets developer-tool events to their host. Its hook owns them.
+    if (target?.closest('[data-fog-of-war-dev-tools]')) return
+    if (target?.closest('[data-connection-toggle]')) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      toggleConnection()
+      return
+    }
+    if (!offline()) return
+    const link = target?.closest('a[href]')
+    if (link?.getAttribute('href').startsWith('#')) return
+    if (link) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      navigate(new URL(link.href), link.dataset.phxLinkState === 'replace' ? 'replace' : 'push')
+    } else if (target?.closest('[phx-click], [phx-click-away], button')) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      message = 'Read-only while offline; nothing queued.'
+      refresh()
+    }
+  }, true)
+  // Install before LiveView binds its own history listener; stop competing pop handlers.
+  window.addEventListener('popstate', async event => {
+    if (!offline()) return
+    event.stopImmediatePropagation()
+    if (!(await navigate(new URL(location.href), 'pop'))) history.replaceState({fogOfWar: true}, '', displayedURL)
+  }, true)
+  for (const name of ['submit', 'input', 'change', 'keydown', 'keyup', 'focusin', 'focusout']) {
+    document.addEventListener(name, event => {
+      if (!offline() || event.target.closest?.('#connection-controls, #persistent-shell, [data-fog-of-war-dev-tools]')) return
+      event.stopImmediatePropagation()
+      if (name === 'submit') event.preventDefault()
+    }, true)
+  }
+  liveSocket.getSocket().onOpen(() => {
+    everOpened = true
+    if (snapshotMode && !paused) {
+      location.assign(location.href)
+      return
+    }
+    unavailable = false
+    refresh()
+  })
+  const connectionLost = () => {
+    if (everOpened && !paused) unavailable = true
+    refresh()
+  }
+  liveSocket.getSocket().onClose(connectionLost)
+  liveSocket.getSocket().onError(connectionLost)
+  new MutationObserver(refresh).observe(document.body, {
+    childList: true, subtree: true, attributes: true, attributeFilter: ['class'],
+  })
+  cache.subscribe(refresh)
+  refresh()
+  return {
+    cache, toggleConnection,
+    canCapture: () => !offline() && !snapshotMode && liveSocket.isConnected(),
+    subscribe(fn) { subscribers.add(fn); fn(lastStatus); return () => subscribers.delete(fn) },
+    registerDevTools(controller) { devTools.add(controller); return () => devTools.delete(controller) },
+  }
+}

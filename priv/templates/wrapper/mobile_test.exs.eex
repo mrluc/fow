@@ -1,0 +1,13 @@
+defmodule <%= @module %>.HomeScreenTest do
+  use Mob.ScreenCase, async: false
+  setup do
+    start_supervised!(<%= @module %>.PublicShell)
+    :ok
+  end
+  test "starts with the bundled public site and renders a native WebView" do
+    view = mount_screen(<%= @module %>.HomeScreen)
+    assert assigns(view).url =~ "http://127.0.0.1:"
+    assert <%= inspect(@origin <> "/") %> in assigns(view).allowed
+    assert_renderable(view)
+  end
+end

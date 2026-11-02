@@ -1,0 +1,25 @@
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: mix local.hex --force && mix local.rebar --force
+      - run: mix deps.get && mix test
+      - run: mix deps.get && mix assets.setup && mix test
+        working-directory: examples/basic
+      - run: mix deps.get && mix assets.setup && mix test
+        working-directory: examples/frontier
+      - run: npm ci --prefix test/browser
+      - run: npx --prefix test/browser playwright install --with-deps chromium
+      - run: bash test/browser/run.sh
+        env:
+          FOG_OF_WAR_BROWSER_CHANNEL: chromium

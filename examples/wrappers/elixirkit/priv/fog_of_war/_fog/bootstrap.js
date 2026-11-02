@@ -1,0 +1,31 @@
+(() => {
+  const bundle = {"assets":{"/css/app.css":"assets/css/app.css"},"name":"Counters","origin":"http://127.0.0.1:47180","pages":{"/":{"file":"pages/8a5edab282632443219e051e4ade2d1d5bbc671c781051bf1437897cbdfea0f1.html","snapshot":{"build":"fog-of-war-2","html":"<section id=\"counter-site\" data-fog-of-war-path=\"/\" class=\"site-shell\"><header class=\"site-header\"><a href=\"/\" class=\"brand\">Counter</a><nav aria-label=\"Main navigation\"><a href=\"/\">All counters</a></nav></header><main id=\"main-content\" class=\"site-content\"><section class=\"index-intro\" aria-labelledby=\"page-title\"><p class=\"eyebrow\">YOUR COUNTERS</p><h1 id=\"page-title\">Counters</h1><p>Choose a counter to open it.</p></section><ul class=\"counter-list\" aria-label=\"Counters\"><li><a href=\"/counters/one\" class=\"counter-link\"><span>Counter one</span><span class=\"counter-value\">0</span></a></li><li><a href=\"/counters/three\" class=\"counter-link\"><span>Counter three</span><span class=\"counter-value\">0</span></a></li><li><a href=\"/counters/two\" class=\"counter-link\"><span>Counter two</span><span class=\"counter-value\">0</span></a></li></ul></main></section>","path":"/","regionId":"counter-site","savedAt":"2026-11-02T00:00:41.212738Z","schema":1,"title":"Counter"}},"/counters/one":{"file":"pages/3a8cf22fbbdb5aa3d05e2d5ffd8a747055a65572d04ebb1db577a06912e68fbd.html","snapshot":{"build":"fog-of-war-2","html":"<section id=\"counter-site\" data-fog-of-war-path=\"/counters/one\" class=\"site-shell\"><header class=\"site-header\"><a href=\"/\" class=\"brand\">Counter</a><nav aria-label=\"Main navigation\"><a href=\"/\">All counters</a></nav></header><main id=\"main-content\" class=\"site-content\"><a href=\"/\" class=\"back-link\">‹ Back</a><section class=\"counter-card\" aria-labelledby=\"counter-title\"><p class=\"eyebrow\">COUNTER</p><h1 id=\"counter-title\">Counter one</h1><output id=\"count\" aria-live=\"polite\">0</output><button disabled=\"disabled\" aria-disabled=\"true\" id=\"increment-counter\">Increment</button></section></main></section>","path":"/counters/one","regionId":"counter-site","savedAt":"2026-11-02T00:00:41.290499Z","schema":1,"title":"Counter"}},"/counters/three":{"file":"pages/c5c48510dd46e71e3ac6d8bbd825848e4e2214353e7c684148e34a822e67d2a8.html","snapshot":{"build":"fog-of-war-2","html":"<section id=\"counter-site\" data-fog-of-war-path=\"/counters/three\" class=\"site-shell\"><header class=\"site-header\"><a href=\"/\" class=\"brand\">Counter</a><nav aria-label=\"Main navigation\"><a href=\"/\">All counters</a></nav></header><main id=\"main-content\" class=\"site-content\"><a href=\"/\" class=\"back-link\">‹ Back</a><section class=\"counter-card\" aria-labelledby=\"counter-title\"><p class=\"eyebrow\">COUNTER</p><h1 id=\"counter-title\">Counter three</h1><output id=\"count\" aria-live=\"polite\">0</output><button disabled=\"disabled\" aria-disabled=\"true\" id=\"increment-counter\">Increment</button></section></main></section>","path":"/counters/three","regionId":"counter-site","savedAt":"2026-11-02T00:00:41.337254Z","schema":1,"title":"Counter"}},"/counters/two":{"file":"pages/845f65901c468ef78039350bd8d5669503bb23041c076a2d1ac1d5eae3b1ebca.html","snapshot":{"build":"fog-of-war-2","html":"<section id=\"counter-site\" data-fog-of-war-path=\"/counters/two\" class=\"site-shell\"><header class=\"site-header\"><a href=\"/\" class=\"brand\">Counter</a><nav aria-label=\"Main navigation\"><a href=\"/\">All counters</a></nav></header><main id=\"main-content\" class=\"site-content\"><a href=\"/\" class=\"back-link\">‹ Back</a><section class=\"counter-card\" aria-labelledby=\"counter-title\"><p class=\"eyebrow\">COUNTER</p><h1 id=\"counter-title\">Counter two</h1><output id=\"count\" aria-live=\"polite\">0</output><button disabled=\"disabled\" aria-disabled=\"true\" id=\"increment-counter\">Increment</button></section></main></section>","path":"/counters/two","regionId":"counter-site","savedAt":"2026-11-02T00:00:41.314234Z","schema":1,"title":"Counter"}}},"schema":1,"scope":"public","start_path":"/"};
+  try {
+    for (const {snapshot} of Object.values(bundle.pages)) {
+      const key = 'fog-of-war:page:' + snapshot.path;
+      if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(snapshot));
+    }
+  } catch (_) {}
+  // Only generated public HTML runs here. Never start a stale LiveView session.
+  document.documentElement.dataset.fogOfWarPublicShell = 'true';
+  const live = document.createElement('a');
+  live.href = bundle.origin + bundle.start_path;
+  live.textContent = 'Open live site';
+  live.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:10px 14px;border-radius:8px;background:#202124;color:white;font:13px system-ui;z-index:99998';
+  document.body.append(live);
+  document.addEventListener('click', event => {
+    const link = event.target.closest?.('a[href]');
+    if (!link) return;
+    const url = new URL(link.href);
+    if (url.origin === location.origin && (!bundle.pages[url.pathname] || url.search)) {
+      event.preventDefault();
+      let notice = document.getElementById('public-shell-notice');
+      if (!notice) {
+        notice = document.createElement('aside'); notice.id = 'public-shell-notice'; notice.role = 'status';
+        notice.style.cssText = 'position:fixed;bottom:8px;left:8px;right:8px;padding:8px;background:#202124;color:white;font:12px system-ui;z-index:99999';
+        document.body.append(notice);
+      }
+      notice.textContent = 'That page is not in the offline bundle. Open the live site to continue.';
+    }
+  });
+})();

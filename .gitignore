@@ -1,0 +1,20 @@
+# Reproducible source only; dependencies and generated/native outputs stay local.
+**/_build/
+**/deps/
+**/node_modules/
+**/target/
+**/.zig-cache/
+**/.gradle/
+**/.fow/
+**/local.properties
+**/mob.local.exs
+**/android/app/build/
+**/android/build/
+**/ios/build/
+**/.DS_Store
+*.tar
+*.dump
+/results/
+/test-results/
+/playwright-report/
+**/src-tauri/gen/

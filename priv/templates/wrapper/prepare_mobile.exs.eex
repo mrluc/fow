@@ -1,0 +1,42 @@
+# Generated, repeatable Mob native integration. Run after deps.get and before a native build.
+# Anchor counts are checked: an upstream layout change must be reviewed, never silently skipped.
+script = File.read!("priv/fog_of_war_seed.js")
+encoded = Base.encode64(script)
+kotlin_chunks = Regex.scan(~r/.{1,16000}/, encoded) |> List.flatten() |> Enum.map_join(", ", &inspect/1)
+origin = <%= inspect(@origin) %>
+patch = fn file, anchor, insertion ->
+  source = File.read!(file)
+  marker = "// FOG_OF_WAR_DOCUMENT_START"
+  ending = "// FOG_OF_WAR_DOCUMENT_END"
+  if String.contains?(source, marker) do
+    unless length(:binary.matches(source, marker)) == 1 && length(:binary.matches(source, ending)) == 1,
+      do: raise("Incomplete native integration markers: #{file}")
+    pattern = ~r/[^\S\n]*\/\/ FOG_OF_WAR_DOCUMENT_START.*?\/\/ FOG_OF_WAR_DOCUMENT_END/s
+    File.write!(file, Regex.replace(pattern, source, fn _ -> insertion <> ending end, global: false))
+  else
+    if length(:binary.matches(source, anchor)) != 1, do: raise("Native integration anchor changed: #{file}")
+    File.write!(file, String.replace(source, anchor, insertion <> ending <> "\n" <> anchor, global: false))
+  end
+end
+for file <- Path.wildcard("android/app/src/main/java/**/MobBridge.kt") do
+  insertion = """
+                // FOG_OF_WAR_DOCUMENT_START
+                if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    val publicSeed = String(android.util.Base64.decode(listOf(#{kotlin_chunks}).joinToString(""), android.util.Base64.DEFAULT), Charsets.UTF_8)
+                    androidx.webkit.WebViewCompat.addDocumentStartJavaScript(this, publicSeed, setOf(#{inspect(origin)}))
+                } else {
+                    android.util.Log.w("FogOfWar", "Document-start preload unsupported; bundled public shell still works")
+                }
+  """
+  patch.(file, "                loadUrl(url)", insertion)
+end
+if File.dir?("ios") do
+  file = "deps/mob/ios/MobRootView.swift"
+  insertion = """
+        // FOG_OF_WAR_DOCUMENT_START
+        let publicSeed = String(data: Data(base64Encoded: "#{encoded}")!, encoding: .utf8)!
+        config.userContentController.addUserScript(WKUserScript(source: publicSeed, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+  """
+  patch.(file, "        let wv = WKWebView(frame: .zero, configuration: config)", insertion)
+end
+IO.puts("Prepared document-start public snapshot preload. Rebuild the native host after changes.")
