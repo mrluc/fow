@@ -51,8 +51,8 @@ export function createFogOfWarCache(build) {
 
   return {
     protect,
-    async save(snapshot) {
-      await protect(snapshot.path)
+    async save(snapshot, {protectRoute = true} = {}) {
+      if (protectRoute) await protect(snapshot.path)
       const write = () => {
         const key = `${PREFIX}${snapshot.path}`
         // Element IDs and build IDs describe content; they aren't cache identities.

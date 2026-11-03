@@ -14,6 +14,6 @@ defmodule FogOfWarFrontierWeb.Router do
   scope "/", FogOfWarFrontierWeb do
     pipe_through :browser
     live "/", MapLive, :home
-    live "/sectors/:id", MapLive, :sector
+    live "/lat/:lat/lon/:lon", MapLive, :sector
   end
 end

@@ -1,116 +1,106 @@
 defmodule FogOfWarFrontierWeb.MapLive do
   use FogOfWarFrontierWeb, :live_view
 
-  @sectors [
-    %{
-      id: "camp",
-      name: "Base camp",
-      terrain: "grass",
-      building: "castle",
-      exits: ["woods", "mill"],
-      detail: "The expedition starts here. Two trails lead into the valley."
-    },
-    %{
-      id: "woods",
-      name: "Pinewood",
-      terrain: "grass",
-      building: "pine",
-      exits: ["camp", "quarry"],
-      detail: "Old pines shelter the northern trail. Stone lies beyond the ridge."
-    },
-    %{
-      id: "quarry",
-      name: "Old quarry",
-      terrain: "gravel",
-      building: "stone",
-      exits: ["woods", "watch"],
-      detail: "A disused quarry. A narrow pass climbs to the watchtower."
-    },
-    %{
-      id: "mill",
-      name: "Windmill",
-      terrain: "sand",
-      building: "mill",
-      exits: ["camp", "market"],
-      detail: "Grain and shelter beside the southern road."
-    },
-    %{
-      id: "market",
-      name: "Crossroads",
-      terrain: "grass",
-      building: "market",
-      exits: ["mill", "watch"],
-      detail: "Two trade routes meet here. The watchtower guards the eastern trail."
-    },
-    %{
-      id: "watch",
-      name: "Watchtower",
-      terrain: "gravel",
-      building: "tower",
-      exits: ["quarry", "market"],
-      detail: "The far end of the valley. Both routes meet beneath the tower."
-    }
-  ]
-  defp sector_path("camp"), do: "/"
-  defp sector_path(id), do: "/sectors/#{id}"
+  def path(lat, lon), do: "/lat/#{lat}/lon/#{lon}"
 
-  def mount(_, _, socket), do: {:ok, assign(socket, reports: 0)}
-
-  def handle_params(params, _, socket) do
-    sector = Enum.find(@sectors, &(&1.id == params["id"])) || hd(@sectors)
-
-    {:noreply,
-     assign(socket,
-       sector: sector,
-       sectors: @sectors,
-       path: if(params["id"], do: "/sectors/#{sector.id}", else: "/")
-     )}
+  def neighbors(lat, lon) do
+    for y <- 0..3, x <- 0..3, max(abs(y - lat), abs(x - lon)) == 1, do: {y, x}
   end
 
+  def mount(_, _, socket), do: {:ok, assign(socket, lat: 0, lon: 0, reports: 0)}
+
+  def handle_params(%{"lat" => lat, "lon" => lon}, _, socket) do
+    with {y, ""} <- Integer.parse(lat),
+         {x, ""} <- Integer.parse(lon),
+         true <- y in 0..3 and x in 0..3 do
+      {:noreply,
+       assign(socket,
+         lat: y,
+         lon: x,
+         path: path(y, x),
+         places: for(a <- 0..3, b <- 0..3, do: {a, b}),
+         neighbors: neighbors(y, x)
+       )}
+    else
+      _ -> {:noreply, push_navigate(socket, to: path(0, 0))}
+    end
+  end
+
+  def handle_params(_, _, socket), do: {:noreply, push_navigate(socket, to: path(0, 0))}
   def handle_event("survey", _, socket), do: {:noreply, update(socket, :reports, &(&1 + 1))}
 
   def render(assigns) do
     ~H"""
-    <FogOfWar.region id="frontier-map" path={@path} class="frontier">
+    <FogOfWar.region :if={assigns[:path]} id="frontier-map" path={@path} class="frontier">
       <header class="command-bar">
-        <div>
-          <span class="signal-light"></span>
-          FRONTIER <span class="command-subtitle">/ RECONNAISSANCE</span>
+        <a
+          href="/lat/0/lon/0"
+          data-phx-link="redirect"
+          data-phx-link-state="push"
+          class="game-logo"
+          aria-label="Fog of War · return to camp"
+        ></a>
+        <div class="expedition">
+          <strong>THE GREEN MARCH</strong><span>EXPEDITION 01 / 16 LOCATIONS</span>
         </div>
-        <span>EXPEDITION 01</span>
       </header>
       <main class="command-center">
         <section class="map-console" aria-labelledby="map-heading">
           <header class="console-heading">
-            <h1 id="map-heading">The eastern valley</h1><span>06 SECTORS</span>
+            <h1 id="map-heading">The eastern valley</h1><span>LAT {@lat} / LON {@lon}</span>
           </header>
           <div class="map-viewport">
-            <div class="island">
-              <div
-                :for={{place, index} <- Enum.with_index(@sectors)}
-                class={[
-                  "sector fow-nav",
-                  "sector-#{index}",
-                  place.id == @sector.id && "current-sector"
-                ]}
-                data-fog-of-war-to={sector_path(place.id)}
-              >
-                <div class={["terrain", place.terrain]}>
-                  <span class={["structure", place.building]}></span>
+            <div id="map-scene" class="map-scene" data-lat={@lat} data-lon={@lon}>
+              <div class="ground-layer" aria-hidden="true">
+                <div
+                  :for={{lat, lon} <- @places}
+                  class={[
+                    "sector fow-nav",
+                    "at-#{lat}-#{lon}",
+                    {lat, lon} == {@lat, @lon} && "current"
+                  ]}
+                  data-fog-of-war-to={path(lat, lon)}
+                >
+                  <div class="floor">
+                    <span :for={tile <- 0..8} class={"terrain-tile tile-#{tile}"}></span>
+                  </div>
+                  <div class="screen-fog"></div>
                 </div>
-                <.link
-                  :if={place.id in @sector.exits}
-                  navigate={sector_path(place.id)}
-                  class="sector-target"
-                  aria-label={"Travel to #{place.name}"}
-                ><span>{place.name}</span></.link>
-                <span
-                  :if={place.id not in @sector.exits}
-                  class="sector-target blocked"
-                  aria-label={"#{place.name}: no direct trail"}
-                ><span>{place.name}</span></span>
-                <span :if={place.id == @sector.id} class="scout" aria-label="Your scout"></span>
               </div>
+              <div class="objects-layer" aria-hidden="true">
+                <div
+                  :for={{lat, lon} <- @places}
+                  class={[
+                    "object fow-nav",
+                    "at-#{lat}-#{lon}",
+                    {lat, lon} == {@lat, @lon} && "current"
+                  ]}
+                  data-fog-of-war-to={path(lat, lon)}
+                >
+                  <span :if={rem(lat + lon, 3) != 0} class="tree"></span>
+                  <span :if={rem(lat * 3 + lon, 4) == 0} class="tree second-tree"></span>
+                </div>
+              </div>
+              <span id="player" class={"scout at-#{@lat}-#{@lon}"} aria-label="Your scout"></span>
+              <nav class="labels-layer" aria-label="Map locations">
+                <div
+                  :for={{lat, lon} <- @places}
+                  class={[
+                    "place-label fow-nav",
+                    "at-#{lat}-#{lon}",
+                    {lat, lon} == {@lat, @lon} && "current"
+                  ]}
+                  data-fog-of-war-to={path(lat, lon)}
+                >
+                  <.link
+                    :if={{lat, lon} in @neighbors}
+                    navigate={path(lat, lon)}
+                    class="location-link"
+                    aria-label={"Travel to #{lat}, #{lon}"}
+                  ><span>{lat} / {lon}</span></.link>
+                  <span :if={{lat, lon} not in @neighbors} class="location-name">{lat} / {lon}</span>
+                </div>
+              </nav>
             </div>
           </div>
           <footer class="map-key">
@@ -118,22 +108,23 @@ defmodule FogOfWarFrontierWeb.MapLive do
             UNKNOWN</span>
           </footer>
         </section>
-        <aside class="orders" aria-labelledby="sector-name">
-          <p class="overline">SECTOR REPORT</p>
-          <h2 id="sector-name">{@sector.name}</h2>
-          <p class="sector-description">{@sector.detail}</p>
-          <p class="overline routes-heading">AVAILABLE TRAILS</p>
+        <aside class="orders">
+          <p class="overline">FIELD JOURNAL</p>
+          <h2 id="sector-name">
+            {if @lat == 0 and @lon == 0, do: "Base camp", else: "The green march"}
+          </h2>
+          <p class="coordinates">LAT {@lat} · LON {@lon}</p>
+          <p class="sector-description">
+            Grass, earth and pine. Follow the edge of the clearing; each step reveals another patch of the valley.
+          </p>
+          <p class="overline routes-heading">NEIGHBORING GROUND</p>
           <nav class="trail-list" aria-label="Available trails">
-            <.link
-              :for={place <- Enum.filter(@sectors, &(&1.id in @sector.exits))}
-              navigate={sector_path(place.id)}
-              class="trail fow-nav"
-            ><span>{place.name}</span><span aria-hidden="true">→</span></.link>
+            <.link :for={{lat, lon} <- @neighbors} navigate={path(lat, lon)} class="trail fow-nav"><span>{lat} / {lon}</span><span aria-hidden="true">↗</span></.link>
           </nav>
-          <button id="survey" phx-click="survey">Survey sector <span>+1</span></button>
+          <button id="survey" phx-click="survey">Survey clearing <span>+1</span></button>
           <p class="report-line">Field reports <output id="reports">{@reports}</output></p>
           <p class="field-note">
-            Follow a trail to explore. Revisit known ground when contact is lost.
+            The three clearings beside camp are charted before departure. Beyond them, the map is yours to discover.
           </p>
         </aside>
       </main>

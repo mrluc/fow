@@ -26,12 +26,18 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   }
   const refreshNavigationStyles = () => {
     setClass(document.documentElement, 'fow-offline', offline())
+    const destinations = new Map()
+    const cached = href => {
+      try {
+        const url = new URL(href, location.href)
+        if (!destinations.has(url.href)) destinations.set(url.href, Boolean(cache.find(url)))
+        return destinations.get(url.href)
+      } catch (_) { return false }
+    }
     for (const container of document.querySelectorAll('.fow-nav')) {
       const links = container.matches('a[href]') ? [container] : [...container.querySelectorAll('a[href]')]
       const destination = container.dataset.fogOfWarTo
-      const uncached = destination ? !cache.find(new URL(destination, location.href)) : links.some(link => {
-        try { return !cache.find(new URL(link.href)) } catch (_) { return true }
-      })
+      const uncached = destination ? !cached(destination) : links.some(link => !cached(link.href))
       setClass(container, 'fow-nav-uncached', uncached)
     }
   }
@@ -97,14 +103,16 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     await transition(() => {
       if (!snapshotMode) enterSnapshotMode()
       presentSavedPage(outlet, snapshot)
+      // The route and its visible content commit together, including during a
+      // delayed View Transition callback. A quick Back must not skip this stop.
+      if (historyAction !== 'pop') {
+        history[historyAction === 'replace' ? 'replaceState' : 'pushState']({fogOfWar: true}, '', url.href)
+      }
+      displayedURL = url.href
+      cache.protect(url.pathname)
+      message = ''
+      refresh()
     }, url)
-    if (historyAction !== 'pop') {
-      history[historyAction === 'replace' ? 'replaceState' : 'pushState']({fogOfWar: true}, '', url.href)
-    }
-    displayedURL = url.href
-    cache.protect(url.pathname)
-    message = ''
-    refresh()
     return true
   }
   const toggleConnection = () => {
