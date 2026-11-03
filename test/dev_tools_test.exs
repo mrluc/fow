@@ -19,4 +19,21 @@ defmodule FogOfWar.DevToolsTest do
     Application.put_env(:fow, :dev_tools, true)
     assert String.trim(render_component(&FogOfWar.dev_tools/1, socket: nil, enabled: false)) == ""
   end
+
+  test "scale defaults to one and renders a positive component setting as a CSS variable" do
+    {:ok, default, _} = FogOfWar.DevToolsLive.mount(%{}, %{}, %Phoenix.LiveView.Socket{})
+    assert default.assigns.scale == 1.0
+
+    {:ok, scaled, _} =
+      FogOfWar.DevToolsLive.mount(%{}, %{"scale" => 0.9}, %Phoenix.LiveView.Socket{})
+
+    html = render_component(&FogOfWar.DevToolsLive.render/1, scaled.assigns)
+    assert html =~ "--fog-of-war-dev-tools-scale: 0.9;"
+
+    for invalid <- [0, -1, "small"] do
+      assert_raise ArgumentError, fn ->
+        FogOfWar.DevToolsLive.mount(%{}, %{"scale" => invalid}, %Phoenix.LiveView.Socket{})
+      end
+    end
+  end
 end

@@ -27,6 +27,11 @@ defmodule FogOfWar do
 
   attr(:semi_transparent, :boolean, default: false)
 
+  attr(:scale, :any,
+    default: 1.0,
+    doc: "Positive numeric scale for developer-tool text and controls"
+  )
+
   def dev_tools(assigns) do
     assigns =
       assign(
@@ -40,7 +45,7 @@ defmodule FogOfWar do
     <%= if @show do %>
       {Phoenix.Component.live_render(@socket, FogOfWar.DevToolsLive,
         id: "fog-of-war-dev-tools", sticky: true,
-        session: %{"semi_transparent" => @semi_transparent})}
+        session: %{"semi_transparent" => @semi_transparent, "scale" => @scale})}
     <% end %>
     """
   end

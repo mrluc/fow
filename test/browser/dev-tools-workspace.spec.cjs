@@ -105,3 +105,28 @@ test('pointer docking, panel resize, splitter resize and viewport clamping survi
   await page.setViewportSize({width:1200,height:850});
   await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/dev-tools-timeline.png')});
 });
+
+for (const scale of [0.9,1.5]) {
+test(`CSS scale ${scale} changes controls without changing docking or pointer resize geometry`,async({page})=>{
+  await page.setViewportSize({width:1200,height:850});await page.goto('/');
+  const host=tools(page);await host.locator('.launcher').click();
+  const header=host.locator('header');const normal=await header.boundingBox();
+  // The server component sets this same public CSS custom property.
+  await host.evaluate((el,scale)=>el.style.setProperty('--fog-of-war-dev-tools-scale',String(scale)),scale);
+  const scaled=await header.boundingBox();
+  expect(scaled.height).toBeCloseTo(normal.height*scale,0);
+  expect((await host.locator('.panel').boundingBox()).width).toBeCloseTo(1180,0);
+  await host.getByRole('button',{name:'Move developer tools'}).press('Home');
+  await expect(host.locator('.tools')).toHaveAttribute('data-dock','top-left');
+  const before=await host.locator('.panel').boundingBox();
+  const handle=await host.getByRole('separator',{name:'Resize developer tools',exact:true}).boundingBox();
+  await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);await page.mouse.down();
+  await page.mouse.move(handle.x+handle.width/2+80,handle.y+handle.height/2+40);await page.mouse.up();
+  const after=await host.locator('.panel').boundingBox();
+  expect(after.width-before.width).toBeCloseTo(80,0);expect(after.height-before.height).toBeCloseTo(40,0);
+  await host.getByRole('button',{name:'Collapse developer tools'}).click();
+  const launcher=await host.locator('.launcher').boundingBox();
+  expect(launcher.x).toBeGreaterThanOrEqual(0);expect(launcher.y).toBeGreaterThanOrEqual(0);
+});
+
+}

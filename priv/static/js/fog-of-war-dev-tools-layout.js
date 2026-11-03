@@ -41,7 +41,8 @@ export function installDevToolsLayout(el, root) {
     const corner = layout.dock.includes('-'), right = layout.dock.includes('right'), bottom = layout.dock.includes('bottom')
     const width = corner ? clamp(layout.width,Math.min(350,innerWidth-20),innerWidth-20) : innerWidth-20
     const height = clamp(layout.height,Math.min(150,innerHeight-20),innerHeight-20)
-    const shownWidth = expanded ? width : 124, shownHeight = expanded ? height : 28
+    const scale = Number.parseFloat(getComputedStyle(el).getPropertyValue('--fog-of-war-dev-tools-scale')) || 1
+    const shownWidth = expanded ? width : 124*scale, shownHeight = expanded ? height : 28*scale
     let x = right || !corner ? innerWidth-shownWidth-10 : 10
     let y = bottom ? innerHeight-shownHeight-10 : 10
     variable('left',`${Math.round(x)}px`); variable('top',`${Math.round(y)}px`)
@@ -66,7 +67,7 @@ export function installDevToolsLayout(el, root) {
     // Header controls retain normal focus and clicks until this becomes a drag.
     if (kind !== 'move') event.preventDefault()
     gesture = {target:event.target,kind,axis:target.dataset.axis,pointerId:event.pointerId,x:event.clientX,y:event.clientY,
-      width:panel.offsetWidth,height:panel.offsetHeight,original:{...layout},
+      width:panel.getBoundingClientRect().width,height:panel.getBoundingClientRect().height,original:{...layout},
       box:el.getBoundingClientRect(),list:root.querySelector('.explorer').getBoundingClientRect(),moved:false}
   }
   const move = event => {
