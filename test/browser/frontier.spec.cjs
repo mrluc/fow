@@ -68,13 +68,14 @@ test('map grows and stays centered while fog retains sharp one-pixel cells over 
     return {width:right-left,center:(left+right)/2};
   });
   const smallLogo=await page.locator('.game-logo').boundingBox();
+  expect(smallLogo.width).toBeCloseTo(640*0.25,0);
   const small=await bounds();
   expect(Math.abs(small.center-320)).toBeLessThan(2);
   await page.setViewportSize({width:1600,height:1000});
   await expect.poll(async () => (await bounds()).width).toBeGreaterThan(small.width*1.5);
   expect(Math.abs((await bounds()).center-800)).toBeLessThan(2);
   const largeLogo=await page.locator('.game-logo').boundingBox();
-  expect(largeLogo.width).toBeGreaterThan(smallLogo.width*2);
+  expect(largeLogo.width).toBeCloseTo(1600*0.2,0);
   expect(largeLogo.width/largeLogo.height).toBeCloseTo(166/84,1);
   await expect.poll(()=>page.locator('canvas.pixel-fog').evaluate(el=>el.width)).toBe(1600);
   const pixels=()=>page.evaluate(()=>{
@@ -98,6 +99,7 @@ test('map grows and stays centered while fog retains sharp one-pixel cells over 
   expect(sample.filled).toBeGreaterThan(1000);expect(sample.invalid).toBe(0);expect(sample.wrongParity).toBe(0);
   await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/frontier-responsive.png')});
   await page.setViewportSize({width:375,height:740});
+  expect((await page.locator('.game-logo').boundingBox()).width).toBeCloseTo(375*0.4,0);
   await expect.poll(async()=>Math.abs((await bounds()).center-187.5)).toBeLessThan(2);
   await expect.poll(async()=> (await bounds()).width).toBeLessThan(375);
 });

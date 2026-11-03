@@ -28,5 +28,24 @@
 @keyframes idle-frame { 0%,100% {opacity:1} 50% {opacity:0} }@keyframes walk-frame { 0%,100% {opacity:0} 50% {opacity:1} }
 @media (prefers-reduced-motion: reduce) { ::view-transition-group(*) { animation-duration: 0s !important; } }
 
-.game-logo { position: fixed; top: clamp(10px, 1.5vw, 24px); left: clamp(12px, 1.6vw, 32px); width: clamp(132px, 20vw, 400px); aspect-ratio: 166 / 84; background: url("/images/fog-of-war-logo.png") center / contain no-repeat; z-index: 5; pointer-events: none; }
-
+/* Logo sizing: edit these three viewport shares and the optional desktop cap. */
+:root {
+  --game-logo-width: 40vw; /* Narrow/mobile: 40% of the viewport width. */
+  --game-logo-max-width: 400px;
+}
+@media (min-width: 600px) {
+  :root { --game-logo-width: 25vw; } /* Medium: 25%. */
+}
+@media (min-width: 1200px) {
+  :root { --game-logo-width: 20vw; } /* Wide: 20%. */
+}
+.game-logo {
+  position: fixed;
+  top: clamp(10px, 1.5vw, 24px);
+  left: clamp(12px, 1.6vw, 32px);
+  width: min(var(--game-logo-width), var(--game-logo-max-width));
+  aspect-ratio: 166 / 84;
+  background: url("/images/fog-of-war-logo.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
