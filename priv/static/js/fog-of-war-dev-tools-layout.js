@@ -12,6 +12,16 @@ export function installDevToolsLayout(el, root) {
   const panel = root.querySelector('.panel'), tools = root.querySelector('.tools')
   const grip = root.querySelector('[data-drag]'), resize = root.querySelector('.resize-handle')
   const splitter = root.querySelector('.splitter')
+  const edges = ['x','y'].map(axis => {
+    const edge = document.createElement('div')
+    edge.className = 'panel-edge';edge.dataset.axis = axis
+    edge.tabIndex = 0;edge.setAttribute('role','separator')
+    edge.setAttribute('aria-label',axis === 'x' ? 'Resize developer tools width' : 'Resize developer tools height')
+    edge.setAttribute('aria-orientation',axis === 'x' ? 'vertical' : 'horizontal')
+    edge.title = axis === 'x' ? 'Drag to resize width' : 'Drag to resize height'
+    panel.appendChild(edge)
+    return edge
+  })
   let expanded = false, gesture = null, suppressClick = false, clickTimer
   const overlay = document.createElement('div')
   overlay.className = 'dock-overlay'
@@ -41,6 +51,7 @@ export function installDevToolsLayout(el, root) {
     splitter.setAttribute('aria-valuenow',String(Math.round(layout.split)))
     tools.dataset.dock = layout.dock
     root.querySelector('[data-dock-label]').textContent = `${layout.dock} · drag header to dock`
+    edges.forEach(edge => { edge.hidden = !corner })
     resize.dataset.edge = corner ? 'corner' : 'wide'
     resize.style.left = corner && right ? '0' : 'auto'
     resize.style.right = corner && right ? 'auto' : '0'
@@ -49,12 +60,12 @@ export function installDevToolsLayout(el, root) {
     resize.title = corner ? 'Drag to resize width and height' : 'Drag to resize height; dock in a corner to resize width'
   }
   const down = event => {
-    const target = event.target.closest('.splitter, .resize-handle, header')
+    const target = event.target.closest('.splitter, .resize-handle, .panel-edge, header')
     if (!target || event.button !== 0 || gesture) return
-    const kind = target === splitter ? 'split' : target === resize ? 'resize' : 'move'
+    const kind = target === splitter ? 'split' : (target === resize || edges.includes(target)) ? 'resize' : 'move'
     // Header controls retain normal focus and clicks until this becomes a drag.
     if (kind !== 'move') event.preventDefault()
-    gesture = {target:event.target,kind,pointerId:event.pointerId,x:event.clientX,y:event.clientY,
+    gesture = {target:event.target,kind,axis:target.dataset.axis,pointerId:event.pointerId,x:event.clientX,y:event.clientY,
       width:panel.offsetWidth,height:panel.offsetHeight,original:{...layout},
       box:el.getBoundingClientRect(),list:root.querySelector('.explorer').getBoundingClientRect(),moved:false}
   }
@@ -86,8 +97,8 @@ export function installDevToolsLayout(el, root) {
       layout.split = (event.clientX-gesture.list.x)/gesture.list.width*100
       apply()
     } else {
-      if (layout.dock.includes('-')) layout.width = gesture.width + (layout.dock.includes('right') ? -dx : dx)
-      layout.height = gesture.height + (layout.dock.includes('bottom') ? -dy : dy)
+      if (gesture.axis !== 'y' && layout.dock.includes('-')) layout.width = gesture.width + (layout.dock.includes('right') ? -dx : dx)
+      if (gesture.axis !== 'x') layout.height = gesture.height + (layout.dock.includes('bottom') ? -dy : dy)
       apply()
     }
   }
@@ -125,12 +136,12 @@ export function installDevToolsLayout(el, root) {
       event.preventDefault()
       const delta = ['ArrowLeft','ArrowUp'].includes(event.key) ? -1 : 1
       layout.dock = event.key==='Home' ? docks[0] : event.key==='End' ? 'bottom' : docks[(docks.indexOf(layout.dock)+delta+docks.length)%docks.length]
-    } else if (event.target === resize) {
+    } else if (event.target === resize || edges.includes(event.target)) {
       event.preventDefault()
-      if (event.key==='ArrowLeft') layout.width-=20
-      if (event.key==='ArrowRight') layout.width+=20
-      if (event.key==='ArrowUp') layout.height-=20
-      if (event.key==='ArrowDown') layout.height+=20
+      if (event.target.dataset.axis !== 'y' && event.key==='ArrowLeft') layout.width-=20
+      if (event.target.dataset.axis !== 'y' && event.key==='ArrowRight') layout.width+=20
+      if (event.target.dataset.axis !== 'x' && event.key==='ArrowUp') layout.height-=20
+      if (event.target.dataset.axis !== 'x' && event.key==='ArrowDown') layout.height+=20
     } else return
     apply(); persist()
   }
@@ -146,7 +157,7 @@ export function installDevToolsLayout(el, root) {
       window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up)
       root.removeEventListener('click',click,true);root.removeEventListener('keydown',key)
       window.removeEventListener('resize',apply)
-      clearTimeout(clickTimer);overlay.remove()
+      clearTimeout(clickTimer);overlay.remove();edges.forEach(edge => edge.remove())
     },
   }
 }

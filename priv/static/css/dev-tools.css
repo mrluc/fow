@@ -59,10 +59,10 @@ tr[data-outcome="denied"] td:nth-child(2) { color:var(--color-bad); }tr[data-kin
 .dock-target[data-active="true"] { background:var(--color-accent);color:var(--color-bg);border-color:var(--color-accent);box-shadow:0 0 0 3px #a8c7fa30; }
 .dock-cursor { position:absolute;padding:5px 8px;border-radius:4px;background:var(--color-bg);border:1px solid var(--color-accent);box-shadow:0 2px 8px #0005;text-transform:capitalize;white-space:nowrap; }
 
-.transparency-toggle { margin-left:auto; }
+
 .transparency-toggle,.connection-toggle { flex:0 0 23px;width:23px;height:23px;padding:3px;border:1px solid var(--color-line);border-radius:3px;background:var(--color-surface);color:var(--color-muted); }
 .transparency-toggle svg,.connection-toggle svg { width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5; }
-.transparency-toggle[aria-pressed="true"] { color:var(--color-accent);border-color:#a8c7fa70; }
+.transparency-toggle[aria-pressed="true"] { color:var(--color-accent); }
 .transparency-toggle rect:last-child { fill:currentColor;fill-opacity:.35; }
 .connection-toggle .pause-icon { stroke-width:3; }
 .connection-toggle .play-icon { display:none;fill:currentColor;stroke:none; }
@@ -70,3 +70,19 @@ tr[data-outcome="denied"] td:nth-child(2) { color:var(--color-bad); }tr[data-kin
 .connection-toggle[data-paused="true"] .play-icon { display:block; }
 
 .tools[data-semi-transparent="true"] .panel { outline:none; }
+
+.transparency-toggle { margin-left:0;border:0;background:transparent;border-radius:0; }
+.connection-toggle { margin-left:auto; }
+.collapse { flex:0 0 28px;width:28px;margin-left:7px;padding:0;border:0;background:transparent;font:700 23px/1 var(--font-ui); }
+.panel-edge { position:absolute;z-index:2;touch-action:none; }
+.panel-edge::after { content:"";position:absolute;background:var(--color-muted);border-radius:2px;opacity:.3; }
+.panel-edge:hover::after { opacity:.8;background:var(--color-accent); }
+.panel-edge:focus-visible { outline:1px solid var(--color-accent);outline-offset:-1px; }
+.panel-edge[data-axis="y"] { left:16px;right:16px;height:5px;bottom:0;cursor:ns-resize; }
+.panel-edge[data-axis="y"]::after { width:28px;height:2px;left:calc(50% - 14px);top:1px; }
+.panel-edge[data-axis="x"] { top:16px;bottom:16px;width:5px;right:0;cursor:ew-resize; }
+.panel-edge[data-axis="x"]::after { height:28px;width:2px;top:calc(50% - 14px);left:1px; }
+.tools[data-dock^="bottom"] .panel-edge[data-axis="y"] { top:0;bottom:auto; }
+.tools[data-dock$="right"] .panel-edge[data-axis="x"] { left:0;right:auto; }
+
+.transparency-toggle:hover:not(:disabled),.collapse:hover:not(:disabled) { background:transparent;color:var(--color-accent); }

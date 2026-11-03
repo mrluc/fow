@@ -28,7 +28,7 @@ test('unified timeline records denied and cached navigation in memory, filters a
   await expect(panel.locator('tr[data-outcome="denied"]')).toBeVisible();
   const stored=await page.evaluate(()=>Object.keys(localStorage));
   expect(stored.every(key=>key.startsWith('fog-of-war:page:'))).toBe(true);
-  await panel.getByRole('tab',{name:'Help',exact:true}).click();
+  await panel.locator('#help-tab').click();
   await expect(panel.getByRole('heading',{name:'Why this fits LiveView'})).toBeVisible();
   await expect(panel.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();
   await panel.getByRole('button',{name:'Reconnect',exact:true}).click();
@@ -48,6 +48,16 @@ test('pointer docking, panel resize, splitter resize and viewport clamping survi
   const handle=await panel.getByRole('separator',{name:'Resize developer tools',exact:true}).boundingBox();
   await drag(panel.getByRole('separator',{name:'Resize developer tools',exact:true}),handle.x+100,handle.y+60);
   const enlarged=await panel.locator('.panel').boundingBox();expect(enlarged.width).toBeGreaterThan(corner.width+70);expect(enlarged.height).toBeGreaterThan(corner.height+30);
+  const widthGrip=panel.getByRole('separator',{name:'Resize developer tools width',exact:true});
+  const widthBox=await widthGrip.boundingBox();
+  await drag(widthGrip,widthBox.x+45,widthBox.y+widthBox.height/2);
+  const wider=await panel.locator('.panel').boundingBox();
+  expect(wider.width).toBeGreaterThan(enlarged.width+30);expect(wider.height).toBe(enlarged.height);
+  const heightGrip=panel.getByRole('separator',{name:'Resize developer tools height',exact:true});
+  const heightBox=await heightGrip.boundingBox();
+  await drag(heightGrip,heightBox.x+heightBox.width/2,heightBox.y+35);
+  const taller=await panel.locator('.panel').boundingBox();
+  expect(taller.height).toBeGreaterThan(wider.height+20);expect(taller.width).toBe(wider.width);
   const divider=panel.getByRole('separator',{name:'Resize cache list and details'});
   const oldSplit=Number(await divider.getAttribute('aria-valuenow')),r=await divider.boundingBox();
   await drag(divider,r.x+60,r.y+r.height/2);
@@ -57,7 +67,7 @@ test('pointer docking, panel resize, splitter resize and viewport clamping survi
   await expect(panel.locator('.tools')).toHaveAttribute('data-dock','bottom');
   expect((await panel.locator('.panel').boundingBox()).width).toBeGreaterThan(1150);
   // The entire header is draggable, including controls; dragging must not click Help.
-  const help=panel.getByRole('tab',{name:'Help',exact:true});
+  const help=panel.locator('#help-tab');
   const helpBox=await help.boundingBox();
   await page.mouse.move(helpBox.x+helpBox.width/2,helpBox.y+helpBox.height/2);
   await page.mouse.down();await page.mouse.move(600,18,{steps:8});

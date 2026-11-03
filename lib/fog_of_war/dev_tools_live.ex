@@ -34,10 +34,10 @@ defmodule FogOfWar.DevToolsLive do
               <button class="transparency-toggle" type="button" data-action="transparency" aria-label="Semi-transparent developer tools" aria-pressed="false" title="Toggle semi-transparent developer tools">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="9" height="9" rx="1" /><rect x="6" y="6" width="8" height="8" rx="1" /></svg>
               </button>
-              <span class="connection-status"><i class="dot" aria-hidden="true"></i><span data-state>Disconnected</span></span>
               <button class="connection-toggle" type="button" data-action="connection" aria-label="Disconnect socket" title="Disconnect socket">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path class="pause-icon" d="M5 3v10M11 3v10" /><path class="play-icon" d="M5 3l8 5-8 5z" /></svg>
               </button>
+              <span class="connection-status"><i class="dot" aria-hidden="true"></i><span data-state>Disconnected</span></span>
               <button type="button" class="collapse" data-action="collapse" aria-label="Collapse developer tools">−</button>
             </header>
             <section id="cache-pane" role="tabpanel" aria-labelledby="cache-tab">
