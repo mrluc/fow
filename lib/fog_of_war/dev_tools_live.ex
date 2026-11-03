@@ -20,7 +20,7 @@ defmodule FogOfWar.DevToolsLive do
         <style><%= Phoenix.HTML.raw(@css) %></style>
         <section class="tools" aria-label="Fog of War developer tools">
           <button class="launcher" type="button" data-action="expand" aria-expanded="false">
-            <i class="dot" aria-hidden="true"></i>Fog of War<span>⌃</span>
+            <i class="dot" aria-hidden="true"></i>Fog of War<span>+</span>
           </button>
           <div class="panel" hidden>
             <header>
@@ -38,7 +38,7 @@ defmodule FogOfWar.DevToolsLive do
               <button class="connection-toggle" type="button" data-action="connection" aria-label="Disconnect socket" title="Disconnect socket">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path class="pause-icon" d="M5 3v10M11 3v10" /><path class="play-icon" d="M5 3l8 5-8 5z" /></svg>
               </button>
-              <button type="button" class="collapse" data-action="collapse" aria-label="Collapse developer tools">⌄</button>
+              <button type="button" class="collapse" data-action="collapse" aria-label="Collapse developer tools">−</button>
             </header>
             <section id="cache-pane" role="tabpanel" aria-labelledby="cache-tab">
               <div class="cache-bar">
