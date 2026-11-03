@@ -31,10 +31,13 @@ for (const variant of ['expired', 'missing-cookie', 'mismatched-csrf']) {
     const observed = await fixture(page, variant);
     await expect.poll(() => observed.documents()).toBe(2);
     await expect.poll(() => observed.staleReplies.length).toBeGreaterThan(0);
-    await expect.poll(() => page.evaluate(() => !!window.liveSocket?.main?.isConnected())).toBe(true);
+    // A second document request does not mean its navigation has committed yet.
+    // Locator assertions survive that commit; evaluating in the old document does not.
+    await expect(page.locator('[data-phx-main]')).toHaveClass(/\bphx-connected\b/);
     const before = Number(await page.locator('#count').innerText());
     await page.locator('#increment-counter').click();
     await expect(page.locator('#count')).toHaveText(String(before + 1));
+    expect(observed.documents()).toBe(2);
   });
 }
 
