@@ -1,19 +1,13 @@
 @import url('/css/terrain.css');
-/* Frontier: painted sprites over procedural earth. Terrain, objects and labels have
+/* Frontier: painted sprites over procedural earth. Terrain, objects and tile targets have
  * independent depth layers; the fog pattern is deliberately aligned to the screen. */
 :root { color-scheme: dark; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; --paper: #20261d; --ink: #e3dfbf; --muted: #9da58a; --line: #444c35; --accent: #ddbf72; background: #11160f; color: var(--ink); }
 * { box-sizing: border-box; } body { margin: 0; min-width: 340px; } a { color: inherit; text-decoration: none; } button { font: inherit; }
-.frontier { min-height: 100vh; background: radial-gradient(ellipse at 35% 40%, #303925, #12170f 80%); }
-.command-bar { height: 100px; padding: 6px 25px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: #192016; }
-.game-logo { display: block; width: 166px; height: 84px; background: url('/images/fog-of-war-logo.png') center / contain no-repeat; }
-.expedition { text-align: right; font-size: 11px; letter-spacing: .12em; }.expedition span { display: block; margin-top: 6px; color: var(--muted); font-size: 9px; }
-.command-center { display: grid; grid-template-columns: minmax(0, 1fr) 245px; max-width: 1280px; margin: auto; min-height: calc(100vh - 100px); }
-.map-console { min-width: 0; display: flex; flex-direction: column; }
-.console-heading { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; }h1 { font-size: 13px; font-weight: 500; margin: 0; }.console-heading > span { font-size: 10px; color: var(--muted); }
-.map-viewport { min-height: 440px; flex: 1; position: relative; overflow: auto; display: grid; place-items: center; }
+.frontier { height: 100dvh; overflow: hidden; background: radial-gradient(ellipse at 35% 40%, #303925, #12170f 80%); }
+.map-viewport { width: 100%; height: 100dvh; position: relative; overflow: hidden; display: grid; place-items: center; }
 .map-scene { position: relative; width: 640px; height: 420px; flex-shrink: 0; isolation: isolate; }
-.ground-layer,.objects-layer,.labels-layer { position: absolute; inset: 0; pointer-events: none; }.ground-layer { z-index: 1; }.objects-layer { z-index: 2; }.labels-layer { z-index: 4; }
-.sector,.object,.place-label { position: absolute; width: 0; height: 0; }
+.ground-layer,.objects-layer { position: absolute; inset: 0; pointer-events: none; }.ground-layer { z-index: 1; }.objects-layer { z-index: 2; }
+.sector,.object { position: absolute; width: 0; height: 0; }
 .floor { position: absolute; left: -48px; top: -48px; width: 96px; height: 96px; display: grid; grid-template-columns: repeat(3,32px); transform: rotateX(60deg) rotateZ(45deg); box-shadow: 3px 3px #17210f, 4px 4px #5b654433; }
 .terrain-tile { display: block; width: 32px; height: 32px; background-image: url('/images/terrain.png'); background-size: 384px 384px; }
 .sector.current .floor { outline: 1px solid #e3c77f; outline-offset: -1px; }
@@ -25,16 +19,18 @@
 .tree { display: block; position: absolute; left: -47px; bottom: -6px; width: 66px; height: 100px; background: url('/images/pine.png') center bottom / contain no-repeat; filter: drop-shadow(3px 3px 2px #0005); }.second-tree { left: 12px; bottom: 3px; width: 49px; height: 74px; }
 .object:not(.current) .tree { filter: grayscale(.7) brightness(.7); }.object.fow-nav-uncached:not(.current) .tree { display: none; }
 .scout { position: absolute; width: 52px; height: 58px; margin-left: -26px; margin-top: -51px; background: url('/images/scout-idle.png') center bottom / contain no-repeat; z-index: 3; view-transition-name: frontier-scout; pointer-events: none; filter: drop-shadow(1px 3px 1px #0006); }.scout.walking { background-image: url('/images/scout-walk.png'); }
-.place-label { z-index: 1; pointer-events: auto; }.location-link,.location-name { position: absolute; top: 22px; left: -24px; width: 48px; min-height: 27px; text-align: center; display: grid; place-items: center; font-size: 10px; background: #182014e8; border: 1px solid #8b967355; box-shadow: 0 2px 4px #0005; }.location-link:hover,.location-link:focus-visible { color: #ffe8a8; border-color: var(--accent); outline: none; }.place-label.current .location-name { color: var(--accent); border-color: #c2a663; }.place-label.fow-nav-uncached:not(.current) .location-link,.place-label.fow-nav-uncached:not(.current) .location-name { color: #76806a; background: #10150ff2; }
-.map-key { display: flex; gap: 24px; padding: 16px 24px; font-size: 9px; color: var(--muted); border-top: 1px solid #454b3755; }.map-key i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; }.key-live { background: var(--accent); }.key-known { background: repeating-conic-gradient(#a0a6a3 0 25%,#303633 0 50%) 0/4px 4px; }.key-dark { background: #000; border: 1px solid #454b37; }
-.orders { padding: 24px 20px; background: #20261de8; border-left: 1px solid var(--line); }.overline { font-size: 9px; letter-spacing: .15em; color: var(--accent); margin: 0 0 10px; }h2 { font: 600 24px/1.15 ui-serif, Georgia, serif; margin: 0 0 8px; }.coordinates { font-size: 10px; color: var(--accent); margin: 0 0 20px; }.sector-description { color: var(--muted); font-size: 11px; }.routes-heading { margin-top: 24px; }.trail-list { display: grid; grid-template-columns: repeat(2,1fr); gap: 0 12px; margin-bottom: 24px; }.trail { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); }.trail:hover { color: var(--accent); }
-#survey { width: 100%; border: 1px solid #817245; background: #3c3c27; color: #f0deb0; padding: 10px; text-align: left; cursor: pointer; }#survey span { float: right; }.report-line { font-size: 10px; color: var(--muted); }.report-line output { float: right; color: var(--ink); }.field-note { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 15px; font-size: 10px; color: var(--muted); }
-.fow-offline .sector.current .screen-fog { display: block; }.fow-offline .sector.current .floor { filter: saturate(.5) brightness(.82); }.fow-offline .object.current .tree { filter: grayscale(.7) brightness(.7); }.fow-offline .trail.fow-nav-uncached,.fow-offline #survey { opacity: .35; cursor: not-allowed; }
+.travel-layer { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.tile-target { position: absolute; width: 136px; height: 68px; margin-left: -68px; margin-top: -34px; clip-path: polygon(50% 0,100% 50%,50% 100%,0 50%); pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tile-target:hover { background: #ffe6a126; }.tile-target:focus-visible { outline: none; background: #ffe6a15c; }
+.fow-offline .tile-target.fow-nav-uncached { cursor: not-allowed; background: none; }
+.fow-offline .sector.current .screen-fog { display: block; }.fow-offline .sector.current .floor { filter: saturate(.5) brightness(.82); }.fow-offline .object.current .tree { filter: grayscale(.7) brightness(.7); }
 ::view-transition-old(root),::view-transition-new(root) { animation: none; }
 ::view-transition-group(frontier-scout) { animation-duration: 650ms; animation-timing-function: linear; }
 ::view-transition-old(frontier-scout) { animation: idle-frame 160ms steps(1,end) 4; mix-blend-mode: normal; }
 ::view-transition-new(frontier-scout) { animation: walk-frame 160ms steps(1,end) 4; mix-blend-mode: normal; }
 @keyframes idle-frame { 0%,100% {opacity:1} 50% {opacity:0} }@keyframes walk-frame { 0%,100% {opacity:0} 50% {opacity:1} }
-@media (max-width: 900px) { .command-center { grid-template-columns: minmax(0,1fr); }.orders { border-left: 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }.orders .sector-description,.orders h2,.coordinates { grid-column: 1; }.routes-heading { grid-column: 2; grid-row: 1; margin-top: 0; }.trail-list { grid-column: 2; grid-row: 2/5; align-self: start; }.field-note { grid-column: 1/-1; }.map-viewport { min-height: 420px; } }
-@media (max-width: 650px) { .map-scene { width: 640px; margin: -45px -65px; transform: scale(.8); }.map-viewport { min-height: 340px; }.command-bar { height: 88px; padding: 4px 18px; }.game-logo { width: 144px; height: 76px; }.expedition { font-size: 9px; }.expedition span { font-size: 8px; } }
+@media (max-width: 590px) { .map-scene { transform: scale(.82); } }
+@media (max-width: 490px) { .map-scene { transform: scale(.67); } }
+@media (max-width: 390px) { .map-scene { transform: scale(.54); } }
+@media (max-height: 430px) and (min-width: 591px) { .map-scene { transform: scale(.8); } }
 @media (prefers-reduced-motion: reduce) { ::view-transition-group(*) { animation-duration: 0s !important; } }

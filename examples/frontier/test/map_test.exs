@@ -5,7 +5,8 @@ defmodule FogOfWarFrontier.MapTest do
   @endpoint FogOfWarFrontierWeb.Endpoint
   test "4 by 4 map, nine terrain tiles per location, corner start and adjacent travel" do
     {:ok, view, _} = live(build_conn(), "/lat/0/lon/0")
-    assert has_element?(view, "#sector-name", "Base camp")
+    assert has_element?(view, "#player.at-0-0")
+    refute has_element?(view, "header, aside, footer, h1, h2")
 
     for path <- ["/lat/0/lon/1", "/lat/1/lon/0", "/lat/1/lon/1"],
         do: assert(has_element?(view, "a[href='#{path}']"))
@@ -21,17 +22,16 @@ defmodule FogOfWarFrontier.MapTest do
     assert view |> render() |> Floki.parse_document!() |> Floki.find(".terrain-tile") |> length() ==
              144
 
-    view |> element("#survey") |> render_click()
-    assert has_element?(view, "#reports", "1")
-
     {:ok, next, _} =
       view
-      |> element(".trail[href='/lat/1/lon/1']")
+      |> element(".tile-target[href='/lat/1/lon/1']")
       |> render_click()
       |> follow_redirect(build_conn(), "/lat/1/lon/1")
 
     assert has_element?(next, "#player.at-1-1")
-    assert next |> render() |> Floki.parse_document!() |> Floki.find(".trail") |> length() == 8
+
+    assert next |> render() |> Floki.parse_document!() |> Floki.find(".tile-target") |> length() ==
+             8
   end
 
   test "root and invalid coordinates return to the starting corner" do

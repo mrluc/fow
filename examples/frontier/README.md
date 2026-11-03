@@ -12,7 +12,7 @@ mix phx.server
 
 Open http://127.0.0.1:47190/lat/0/lon/0. The three neighboring public pages are preloaded from real server renders into the Fog of War cache after the initial page mounts. This is online preloading, not a bundled cold-offline first installation. Saving those neighboring pages does not change the current tab's route protection. A completed preload is marked in `frontier:seed:v2`; remove that key to repeat it.
 
-Open the floating developer tools and pause the connection. Neighboring cached locations remain navigable. Other locations are black until visited; known ground is dimmed under a grey checkerboard facing the camera. The labels have their own layer above all terrain and trees. Survey is a server action, disabled in cached presentations. No database or Counter app code is used.
+Open the floating developer tools and pause the connection. Neighboring cached locations remain navigable. Other locations are black until visited; known ground is dimmed under a grey checkerboard facing the camera. The map fills the viewport: no heading, journal, legend, logo or coordinate labels. Click an adjacent diamond to move; each diamond remains a keyboard-accessible link with a descriptive accessible name. The floating developer tools are the only surrounding UI. No database or Counter app code is used.
 
 ## Terrain and artwork
 
@@ -22,6 +22,6 @@ The emblem, pine, standing scout, and walking scout are original generated PNGs 
 
 ## Walking transitions
 
-`assets/js/map-transitions.js` connects LiveView's document patch callback and Fog of War's cached navigation to the same View Transition API. The scout has a named view-transition element; its before/after positions interpolate across the map while CSS alternates the idle and walking snapshots. The actual scout returns to its idle pose when the transition finishes. Terrain and labels remain still. Reduced-motion preferences and browsers without the API apply navigation immediately. This is a simple two-pose walk, not a full directional animation set.
+`assets/js/map-transitions.js` connects LiveView's document patch callback and Fog of War's cached navigation to the same View Transition API. The scout has a named view-transition element; its before/after positions interpolate across the map while CSS alternates the idle and walking snapshots. The actual scout returns to its idle pose when the transition finishes. Terrain and tile targets remain still. Reduced-motion preferences and browsers without the API apply navigation immediately. This is a simple two-pose walk, not a full directional animation set.
 
-`test/map_test.exs` checks routes, adjacency and tile counts. The package's `test/browser/frontier.spec.cjs` checks initial preloading, transitions, labels/fog layers, read-only saved reports, missing destinations, and immediate Back after cached moves. Neither the tests nor the app sleep to make history work.
+`test/map_test.exs` checks routes, adjacency and tile counts. The package's `test/browser/frontier.spec.cjs` checks initial preloading, transitions, whole-tile navigation, fog layers, absence of page chrome, missing destinations, and immediate Back after cached moves. Neither the tests nor the app sleep to make history work.
