@@ -18,7 +18,7 @@ test('localStorage compresses real map HTML, reads legacy snapshots, and preserv
   console.log('Map localStorage characters:',stats.original,'→',stats.stored);
   const tools=page.locator('[data-fog-of-war-dev-tools]');
   await tools.locator('.launcher').click();
-  await tools.getByRole('button',{name:'Pause connection',exact:true}).click();
+  await tools.getByRole('button',{name:'Disconnect socket',exact:true}).click();
   const requests=[];page.on('request',r=>requests.push(r.url()));
   await page.locator('.tile-target[href="/lat/0/lon/1"]').click();
   await expect(page.locator('#player')).toHaveClass(/at-0-1/);

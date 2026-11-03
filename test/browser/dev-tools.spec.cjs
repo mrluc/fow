@@ -22,7 +22,7 @@ test('package dev tools survive routing and offline handoff, with isolated compa
   await expect(page.locator('#count')).toHaveText('1');
   const count = await page.locator('#count').innerText();
   await expect.poll(() => paths(page)).toEqual(['/', '/counters/one']);
-  await panel.getByRole('button', {name: 'Pause connection', exact: true}).click();
+  await panel.getByRole('button', {name: 'Disconnect socket', exact: true}).click();
   await expect.poll(() => page.evaluate(() => window.liveSocket.isConnected())).toBe(false);
   const requests = [];
   page.on('request', request => requests.push(request.url()));
@@ -37,8 +37,8 @@ test('package dev tools survive routing and offline handoff, with isolated compa
   await expect(panel.locator('.launcher')).toBeVisible();
   await panel.locator('.launcher').click();
   await panel.getByRole('tab', {name: /Cache/}).click();
-  await expect(panel.locator('tbody tr')).toHaveCount(2);
-  await panel.locator('tbody tr').filter({hasText: '/counters/one'}).click();
+  await expect(panel.locator('tbody tr[data-kind="cache"]')).toHaveCount(2);
+  await panel.locator('tbody tr[data-kind="cache"]').filter({hasText: '/counters/one'}).click();
   await expect(panel.locator('[data-detail]')).toContainText('"storageBytes"');
   await expect(panel.locator('[data-detail]')).toContainText('Counter one');
   const dimensions = await panel.locator('.panel').boundingBox();
@@ -48,7 +48,8 @@ test('package dev tools survive routing and offline handoff, with isolated compa
   // A host site's aggressive button stylesheet must not reach the tool's shadow tree.
   await page.addStyleTag({content: 'button {font-size: 80px !important; padding: 80px !important}'});
   expect(await panel.locator('[data-action="clear"]').evaluate(el => getComputedStyle(el).fontSize)).toBe('11px');
-  await panel.getByRole('tab', {name: 'Connection', exact: true}).click();
+  await panel.getByRole('tab', {name: 'Help', exact: true}).click();
+  await expect(panel.getByRole('heading', {name:'A website that remembers what you saw'})).toBeVisible();
   expect(requests).toEqual([]);
   await panel.getByRole('button', {name: 'Reconnect', exact: true}).click();
   await ready(page);
@@ -69,11 +70,14 @@ test('clear unused preserves every open Fog of War route and unrelated localStor
   const panel = host(page);
   await panel.locator('.launcher').click();
   await panel.getByRole('tab', {name: /Cache/}).click();
-  await expect(panel.locator('tbody tr')).toHaveCount(4);
-  const renderedPaths = await panel.locator('tbody tr td:first-child').allTextContents();
+  await expect(panel.locator('tbody tr[data-kind="cache"]')).toHaveCount(4);
+  const times=await panel.locator('tbody tr[data-kind="cache"]').evaluateAll(rows=>rows.map(row=>Number(row.dataset.time)));
+  expect(times).toEqual([...times].sort((a,b)=>b-a));
+  await panel.getByRole('button',{name:'Path',exact:true}).click();
+  const renderedPaths = await panel.locator('tbody tr[data-kind="cache"] td:first-child').allTextContents();
   expect(renderedPaths).toEqual([...renderedPaths].sort());
-  await expect(panel.locator('tbody tr').filter({hasText: '/counters/one'}).locator('td').last()).toHaveText('●');
-  await expect(panel.locator('tbody tr').filter({hasText: '/counters/two'}).locator('td').last()).toHaveText('●');
+  await expect(panel.locator('tbody tr[data-kind="cache"]').filter({hasText: '/counters/one'}).locator('td').last()).toHaveText('●');
+  await expect(panel.locator('tbody tr[data-kind="cache"]').filter({hasText: '/counters/two'}).locator('td').last()).toHaveText('●');
   await panel.getByRole('button', {name: 'Clear unused', exact: true}).click();
   await expect.poll(() => paths(page)).toEqual(['/counters/one', '/counters/two']);
   expect(await other.evaluate(() => localStorage.getItem('example:unrelated'))).toBe('keep me');
@@ -96,7 +100,7 @@ test('without cross-tab locks inspection works and destructive clearing stays di
   const panel = host(page);
   await panel.locator('.launcher').click();
   await panel.getByRole('tab', {name: /Cache/}).click();
-  await expect(panel.locator('tbody tr')).toHaveCount(2);
+  await expect(panel.locator('tbody tr[data-kind="cache"]')).toHaveCount(2);
   await expect(panel.getByRole('button', {name: 'Clear unused', exact: true})).toBeDisabled();
   await expect(panel.getByRole('button', {name: 'Clear unused', exact: true})).toHaveAttribute('title', /Web Locks/);
 });

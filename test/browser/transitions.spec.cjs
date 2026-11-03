@@ -19,7 +19,7 @@ test('counter navigation slides in both directions online and from cache; counte
   await expect.poll(() => page.evaluate(() => window.transitions)).toEqual(['forward', 'back']);
   const panel = page.locator('[data-fog-of-war-dev-tools]');
   await panel.getByRole('button', {name: /Fog of War/}).click();
-  await panel.getByRole('button', {name: 'Pause connection', exact: true}).click();
+  await panel.getByRole('button', {name: 'Disconnect socket', exact: true}).click();
   await page.locator('a[href="/counters/one"]').click();
   await expect(page.locator('#increment-counter')).toBeDisabled();
   await page.goBack();

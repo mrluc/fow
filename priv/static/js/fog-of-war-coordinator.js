@@ -6,8 +6,41 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   const subscribers = new Set()
   const devTools = new Set()
   let lastStatus = null
+  const navigationEvents = []
+  const navigationSubscribers = new Set()
+  let nextEvent = 0, liveAttempt = null
+  const recordNavigation = (url, source) => {
+    let cached = false
+    try { cached = Boolean(cache.find(url)) } catch (_) { /* Logging must not break navigation. */ }
+    const item = {id:`nav-${++nextEvent}`, path:url.pathname+url.search+url.hash,
+      from:new URL(displayedURL).pathname, source, outcome:'attempt', time:Date.now(),
+      cached}
+    navigationEvents.unshift(item)
+    if (navigationEvents.length > 200) navigationEvents.pop()
+    navigationSubscribers.forEach(fn => fn())
+    return item
+  }
+  const finishNavigation = (item, outcome, reason = '') => {
+    Object.assign(item, {outcome, reason, time:Date.now()})
+    navigationSubscribers.forEach(fn => fn())
+  }
   cache.protect(location.pathname)
-  window.addEventListener('phx:page-loading-stop', () => cache.protect(location.pathname))
+  window.addEventListener('phx:page-loading-start', event => {
+    if (offline() || !event.detail?.to) return
+    const url = new URL(event.detail.to, location.href)
+    // LiveView can announce both redirect and root loading for one destination.
+    if (liveAttempt?.path === url.pathname + url.search + url.hash) return
+    if (liveAttempt) finishNavigation(liveAttempt, 'superseded')
+    liveAttempt = recordNavigation(url, 'LiveView')
+  })
+  window.addEventListener('phx:page-loading-stop', () => {
+    cache.protect(location.pathname)
+    if (liveAttempt && !offline()) {
+      liveAttempt.path = location.pathname + location.search + location.hash
+      finishNavigation(liveAttempt, 'live')
+      liveAttempt = null
+    }
+  })
   let paused = false
   let unavailable = false
   let everOpened = false
@@ -59,7 +92,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     if (debugMessage) debugMessage.hidden = !message
     setText('fog-of-war-debug-detail', paused ? 'DEBUG MODE · CONNECTION PAUSED' : 'DEBUG MODE · SERVER UNAVAILABLE')
     setText('connection-note', message || 'Browser-side control · closes this tab’s LiveView socket.')
-    const status = {connection: offline() ? 'paused' : ready ? 'live' : 'connecting',
+    const status = {socketConnected: liveSocket.isConnected() && !paused, connection: offline() ? 'paused' : ready ? 'live' : 'connecting',
       text: paused ? 'Paused' : unavailable ? 'Server unavailable' : ready ? 'Live' : 'Connecting',
       message, snapshotMode, toggleLabel: offline() ? 'Reconnect' : 'Pause connection'}
     if (JSON.stringify(status) !== JSON.stringify(lastStatus)) {
@@ -93,12 +126,14 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   let navigation = 0
   const navigate = async (url, historyAction = 'push') => {
     const attempt = ++navigation
+    const log = recordNavigation(url, historyAction === "pop" ? "History" : "Cached navigation")
     await cache.protect(url.pathname)
     const snapshot = await lookup(url)
-    if (attempt !== navigation || !offline()) return true
+    if (attempt !== navigation || !offline()) { finishNavigation(log, 'superseded'); return true }
     if (!snapshot) {
       await cache.protect(new URL(displayedURL).pathname)
       message = 'This page is not available offline; it has not been saved.'
+      finishNavigation(log, 'denied', 'No usable saved page for this destination.')
       refresh()
       return false
     }
@@ -112,6 +147,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
         history[historyAction === 'replace' ? 'replaceState' : 'pushState']({fogOfWar: true}, '', url.href)
       }
       displayedURL = url.href
+      finishNavigation(log, 'cached')
       cache.protect(url.pathname)
       message = ''
       refresh()
@@ -193,6 +229,9 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   refresh()
   return {
     cache, toggleConnection,
+    navigationEvents: () => navigationEvents.map(item => ({...item})),
+    subscribeNavigations(fn) { navigationSubscribers.add(fn); return () => navigationSubscribers.delete(fn) },
+    clearNavigations() { navigationEvents.length = 0; navigationSubscribers.forEach(fn => fn()) },
     canCapture: () => !offline() && !snapshotMode && liveSocket.isConnected(),
     subscribe(fn) { subscribers.add(fn); fn(lastStatus); return () => subscribers.delete(fn) },
     registerDevTools(controller) { devTools.add(controller); return () => devTools.delete(controller) },

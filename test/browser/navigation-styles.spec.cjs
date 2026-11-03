@@ -13,7 +13,7 @@ test('app styling follows offline state and cached destinations across routing a
   await expect(page.locator('html')).not.toHaveClass(/fow-offline/);
   const panel = page.locator('[data-fog-of-war-dev-tools]');
   await panel.getByRole('button', {name: /Fog of War/}).click();
-  await panel.getByRole('button', {name: 'Pause connection', exact: true}).click();
+  await panel.getByRole('button', {name: 'Disconnect socket', exact: true}).click();
   await expect(page.locator('html')).toHaveClass(/fow-offline/);
   expect(await two.evaluate(el => getComputedStyle(el).opacity)).toBe('0.4');
   await two.click();

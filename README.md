@@ -170,7 +170,7 @@ config :fow, dev_tools: config_env() == :dev
 
 The default is disabled. A particular call can override this with `enabled={true}` or `enabled={false}`. `installFogOfWar(liveSocket)` installs the tool's hook before `liveSocket.connect()`; no additional hook imports, example-specific JavaScript, CSS imports or document click listeners are needed. The package ships the LiveView, markup, styles and client code. Styles live in a ShadowRoot so the host application's styles do not alter the controls.
 
-The small launcher expands into a floating horizontal toolbar. **Connection** pauses/reconnects this tab's actual LiveView socket and shows offline navigation notices in a fixed-height row. **Cache** lists Fog of War entries sorted by path, estimated storage bytes, saved time, build and open-route protection. Select a row to inspect all stored metadata and its rendered HTML. Sizes estimate localStorage's UTF-16 keys and values; they do not claim to measure browser disk usage or the origin's other storage.
+The small launcher expands into a floating, dockable toolbar. Its header always shows the socket state and Disconnect socket / Reconnect control. **Cache** combines saved pages with in-memory navigation attempts, live arrivals, cached visits and denials. Cache/Nav checkboxes filter the rows; the default order is newest first and every column is sortable. Vsn means the stored record format; the renderer compatibility tag remains in the selected page's details. Select a saved page to read its decoded HTML and metadata, or a navigation event for its outcome and reason. Sizes estimate localStorage's UTF-16 keys and values, not browser disk usage.
 
 **Clear unused** removes only Fog of War page entries for routes that are not open in cooperating Fog of War tabs on this origin. Every initialized tab holds a shared Web Lock for its current route, including while reading cached pages. Registration and clearing share a maintenance lock; this uses live browser ownership rather than expiring timestamps. Closing the document releases its locks. Unreadable records are preserved because their route cannot be verified. If Web Locks is unavailable, inspection still works and clearing is disabled. Older clients and tabs that do not initialize Fog of War cannot advertise their open routes; this is not a browser-wide tab inventory.
 
@@ -186,7 +186,7 @@ mix setup
 mix phx.server
 ```
 
-Open [the basic example](http://127.0.0.1:47180/). The site shows a counters index and separate counter pages; its content contains no library-specific controls. In development, the package’s compact floating toolbar provides Connection and Cache tabs. Expand it to pause/reconnect the socket or inspect and clear unused cached pages. Navigate between saved pages offline; the counters remain read-only until reconnect.
+Open [the basic example](http://127.0.0.1:47180/). The site shows a counters index and separate counter pages; its content contains no library-specific controls. In development, the package’s compact floating toolbar provides Cache and Help tabs, with connection controls always in its header. Expand it to disconnect/reconnect the socket or inspect and clear unused cached pages. Navigate between saved pages offline; the counters remain read-only until reconnect.
 
 ## Current scope
 
@@ -266,3 +266,10 @@ For non-link navigation decoration, `class="fow-nav" data-fog-of-war-to="/destin
 New snapshots gzip their HTML and store it as base64 in localStorage, leaving route, build, title and timestamp metadata readable. Compression is used only when the complete encoded record is smaller. Existing uncompressed snapshots remain readable and are replaced on the next successful capture. Browsers without the native compression/decompression APIs continue saving plain HTML.
 
 Compression/decompression is asynchronous and uses the browser's built-in streams; no extra JavaScript dependency is required. Writes preserve capture order. Offline presentation decompresses the saved HTML before restoring it, and the developer tools report the size actually stored, including base64 and metadata overhead. The snapshot inspector continues showing decoded HTML. Compression reduces storage; it does not encrypt cached content.
+
+
+### Developer-tool layout and navigation history
+
+Drag the title grip to snap to any corner or edge center. Corners start compact and allow width/height resizing; edge centers span the viewport and allow height resizing. Drag the small outer handle to resize the panel, or the vertical divider to resize its list/detail split. Arrow keys operate the grip, resize handle and divider. Layout preferences use sessionStorage and survive live navigation and reloads. They are separate from the cached pages in localStorage.
+
+Navigation events are bounded to 200 records in this document's memory. They never enter localStorage or the exported public bundle. A full reload starts a fresh timeline, including any new initial LiveView arrival. An attempt is updated when the navigation completes or is denied; a stored page remains a separate record showing its latest capture. Clear nav removes only these events; Clear unused retains its existing cross-tab protection. Help explains read-only remembered pages, server-driven UI, stale values and the difference between record versions and compatibility tags.
