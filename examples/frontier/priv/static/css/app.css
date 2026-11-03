@@ -28,5 +28,5 @@
 @keyframes idle-frame { 0%,100% {opacity:1} 50% {opacity:0} }@keyframes walk-frame { 0%,100% {opacity:0} 50% {opacity:1} }
 @media (prefers-reduced-motion: reduce) { ::view-transition-group(*) { animation-duration: 0s !important; } }
 
-.game-logo { position: fixed; top: 16px; left: 20px; width: 166px; height: 84px; background: url("/images/fog-of-war-logo.png") center / contain no-repeat; z-index: 5; pointer-events: none; }
-@media (max-width: 490px) { .game-logo { top: 10px; left: 12px; width: 132px; height: 68px; } }
+.game-logo { position: fixed; top: clamp(10px, 1.5vw, 24px); left: clamp(12px, 1.6vw, 32px); width: clamp(132px, 20vw, 400px); aspect-ratio: 166 / 84; background: url("/images/fog-of-war-logo.png") center / contain no-repeat; z-index: 5; pointer-events: none; }
+
