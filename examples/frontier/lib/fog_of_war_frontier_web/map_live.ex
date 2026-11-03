@@ -75,7 +75,7 @@ defmodule FogOfWarFrontierWeb.MapLive do
         </div>
       </main>
     </FogOfWar.region>
-    <FogOfWar.dev_tools socket={@socket} />
+    <FogOfWar.dev_tools socket={@socket} semi_transparent={true} />
     """
   end
 end

@@ -25,6 +25,8 @@ defmodule FogOfWar do
   attr(:socket, :any, required: true)
   attr(:enabled, :boolean, default: nil)
 
+  attr(:semi_transparent, :boolean, default: false)
+
   def dev_tools(assigns) do
     assigns =
       assign(
@@ -37,7 +39,8 @@ defmodule FogOfWar do
     ~H"""
     <%= if @show do %>
       {Phoenix.Component.live_render(@socket, FogOfWar.DevToolsLive,
-        id: "fog-of-war-dev-tools", sticky: true)}
+        id: "fog-of-war-dev-tools", sticky: true,
+        session: %{"semi_transparent" => @semi_transparent})}
     <% end %>
     """
   end

@@ -1,6 +1,6 @@
 const STORE = 'fog-of-war:dev-tools-layout'
-const docks = ['top-left','top','top-right','right','bottom-right','bottom','bottom-left','left']
-const anchors = [[0,0],[.5,0],[1,0],[1,.5],[1,1],[.5,1],[0,1],[0,.5]]
+const docks = ['top-left','top','top-right','bottom-right','bottom','bottom-left']
+const anchors = [[0,0],[.5,0],[1,0],[1,1],[.5,1],[0,1]]
 const dockName = dock => dock.replaceAll('-', ' ')
 const nearestDock = (x,y) => {
   const distances = anchors.map(([a,b]) => (x/innerWidth-a)**2+(y/innerHeight-b)**2)
@@ -34,7 +34,6 @@ export function installDevToolsLayout(el, root) {
     const shownWidth = expanded ? width : 124, shownHeight = expanded ? height : 28
     let x = right || !corner ? innerWidth-shownWidth-10 : 10
     let y = bottom ? innerHeight-shownHeight-10 : 10
-    if (layout.dock === 'left' || layout.dock === 'right') y = (innerHeight-shownHeight)/2
     variable('left',`${Math.round(x)}px`); variable('top',`${Math.round(y)}px`)
     variable('width',`${shownWidth}px`); variable('height',`${height}px`)
     layout.split = clamp(layout.split,20,80)
@@ -125,7 +124,7 @@ export function installDevToolsLayout(el, root) {
     } else if (event.target === grip) {
       event.preventDefault()
       const delta = ['ArrowLeft','ArrowUp'].includes(event.key) ? -1 : 1
-      layout.dock = event.key==='Home' ? docks[0] : event.key==='End' ? 'bottom' : docks[(docks.indexOf(layout.dock)+delta+8)%8]
+      layout.dock = event.key==='Home' ? docks[0] : event.key==='End' ? 'bottom' : docks[(docks.indexOf(layout.dock)+delta+docks.length)%docks.length]
     } else if (event.target === resize) {
       event.preventDefault()
       if (event.key==='ArrowLeft') layout.width-=20

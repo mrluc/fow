@@ -62,6 +62,8 @@ test('pointer docking, panel resize, splitter resize and viewport clamping survi
   await page.mouse.move(helpBox.x+helpBox.width/2,helpBox.y+helpBox.height/2);
   await page.mouse.down();await page.mouse.move(600,18,{steps:8});
   await expect(panel.locator('.dock-overlay')).toBeVisible();
+  await expect(panel.locator('[data-dock-target]')).toHaveCount(6);
+  await expect(panel.locator('[data-dock-target="left"], [data-dock-target="right"]')).toHaveCount(0);
   await expect(panel.locator('[data-dock-target="top"]')).toHaveAttribute('data-active','true');
   await expect(panel.locator('.dock-cursor')).toContainText('top · full width');
   await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/dev-tools-docking.png')});

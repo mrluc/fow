@@ -14,6 +14,17 @@ function mountDevTools(el, coordinator) {
   root.append(el.querySelector('template').content.cloneNode(true))
   const get = selector => root.querySelector(selector)
   const tools = get('.tools'), layout = installDevToolsLayout(el,root)
+  const transparencyKey = 'fog-of-war:dev-tools-transparency'
+  let semiTransparent = el.dataset.semiTransparent === 'true'
+  try {
+    const saved = sessionStorage.getItem(transparencyKey)
+    if (saved !== null) semiTransparent = saved === 'true'
+  } catch (_) {}
+  const applyTransparency = () => {
+    tools.dataset.semiTransparent = String(semiTransparent)
+    get('[data-action="transparency"]').setAttribute('aria-pressed',String(semiTransparent))
+  }
+  applyTransparency()
   let retained=false, expanded=false, tab='cache', selected=null, rows=[]
   let refreshVersion=0, detailVersion=0, listSignature=null
   let sorting={key:'time',direction:-1}
@@ -119,6 +130,10 @@ function mountDevTools(el, coordinator) {
       case 'expand':setExpanded(true);break
       case 'collapse':setExpanded(false);break
       case 'connection':coordinator.toggleConnection();break
+      case 'transparency':
+        semiTransparent = !semiTransparent;applyTransparency()
+        try { sessionStorage.setItem(transparencyKey,String(semiTransparent)) } catch (_) {}
+        break
       case 'refresh':notice('');await refreshCache();break
       case 'clear-nav':coordinator.clearNavigations();break
       case 'clear':
@@ -148,9 +163,11 @@ function mountDevTools(el, coordinator) {
   const unsubscribeStatus=coordinator.subscribe(status=>{
     tools.dataset.connection=status.connection
     tools.dataset.socket=status.socketConnected?'connected':'closed'
-    get('[data-state]').textContent=status.socketConnected?'Live':status.text
+    get('[data-state]').textContent=status.socketConnected?'Live':'Disconnected'
     get('[data-state]').title=status.text
-    get('[data-action="connection"]').textContent=status.connection==='paused'?'Reconnect':'Disconnect socket'
+    const connection=get('[data-action="connection"]')
+    connection.dataset.paused=String(status.connection==='paused')
+    connection.setAttribute('aria-label',status.connection==='paused'?'Reconnect':'Disconnect socket')
     get('[data-action="connection"]').title=status.connection==='paused'?'Reconnect; cached browsing reloads the current route.':'Disconnect socket'
     get('[data-message]').textContent=status.message||(status.snapshotMode?'Read-only cached HTML · reconnect loads the current route.':'Navigation events stay in memory in this document.')
     get('[data-message]').title=get('[data-message]').textContent

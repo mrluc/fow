@@ -116,3 +116,27 @@ test('online capture replaces legacy element/build keys with one record per rout
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('fog-of-war:page:')).sort())).toEqual(['fog-of-war:page:/']);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fog-of-war:page:/')).regionId)).toBe('counter-site');
 });
+
+test('transparency is opt-in, toggle survives reload and routing, and icon controls show connection state',async({page})=>{
+  await page.setViewportSize({width:375,height:650});
+  await page.goto('/');await ready(page);
+  const panel=host(page);await panel.locator('.launcher').click();
+  const transparency=panel.getByRole('button',{name:'Semi-transparent developer tools',exact:true});
+  await expect(transparency).toHaveAttribute('aria-pressed','false');
+  expect(await panel.locator('.panel').evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
+  await transparency.click();
+  await expect(transparency).toHaveAttribute('aria-pressed','true');
+  expect(await panel.locator('.panel').evaluate(el=>getComputedStyle(el).opacity)).toBe('0.9');
+  await page.reload();await ready(page);await panel.locator('.launcher').click();
+  await expect(transparency).toHaveAttribute('aria-pressed','true');
+  await page.locator('a[href="/counters/one"]').click();await ready(page);
+  await expect(transparency).toHaveAttribute('aria-pressed','true');
+  const connection=panel.getByRole('button',{name:'Disconnect socket',exact:true});
+  expect((await connection.boundingBox()).width).toBeLessThan(30);
+  await expect(connection.locator('.pause-icon')).toBeVisible();
+  await connection.click();await expect(panel.locator('[data-state]')).toHaveText('Disconnected');
+  const reconnect=panel.getByRole('button',{name:'Reconnect',exact:true});
+  await expect(reconnect.locator('.play-icon')).toBeVisible();
+  await reconnect.click();await expect(panel.locator('[data-state]')).toHaveText('Live');
+  await transparency.click();await expect(transparency).toHaveAttribute('aria-pressed','false');
+});

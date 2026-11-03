@@ -6,12 +6,16 @@ defmodule FogOfWar.DevToolsLive do
   @external_resource @css_path
   @css File.read!(@css_path)
 
-  def mount(_params, _session, socket), do: {:ok, assign(socket, :css, @css), layout: false}
+  def mount(_params, session, socket) do
+    {:ok,
+     assign(socket, css: @css, semi_transparent: Map.get(session, "semi_transparent", false)),
+     layout: false}
+  end
 
   def render(assigns) do
     ~H"""
     <aside id="fog-of-war-dev-tools-panel" phx-hook="FogOfWarDevTools"
-      data-fog-of-war-dev-tools phx-update="ignore">
+      data-fog-of-war-dev-tools data-semi-transparent={to_string(@semi_transparent)} phx-update="ignore">
       <template>
         <style><%= Phoenix.HTML.raw(@css) %></style>
         <section class="tools" aria-label="Fog of War developer tools">
@@ -20,15 +24,20 @@ defmodule FogOfWar.DevToolsLive do
           </button>
           <div class="panel" hidden>
             <header>
-              <button class="drag-handle" type="button" data-drag aria-label="Move developer tools" title="Drag to an edge or corner; arrow keys change dock">⠿ <strong>Fog of War</strong></button>
+              <button class="drag-handle" type="button" data-drag aria-label="Move developer tools" title="Drag to a corner or the top/bottom center; arrow keys change dock">⠿ <strong>Fog of War</strong></button>
               <div role="tablist" aria-label="Developer tools">
                 <button type="button" role="tab" id="cache-tab" aria-controls="cache-pane"
                   aria-selected="true" data-tab="cache">Cache <span data-count>0</span></button>
                 <button type="button" role="tab" id="help-tab" aria-controls="help-pane"
                   aria-selected="false" tabindex="-1" data-tab="help">Help</button>
               </div>
-              <span class="connection-status"><i class="dot" aria-hidden="true"></i><span data-state>Connecting</span></span>
-              <button class="connection-toggle" type="button" data-action="connection" title="Disconnect socket">Disconnect socket</button>
+              <button class="transparency-toggle" type="button" data-action="transparency" aria-label="Semi-transparent developer tools" aria-pressed="false" title="Toggle semi-transparent developer tools">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="9" height="9" rx="1" /><rect x="6" y="6" width="8" height="8" rx="1" /></svg>
+              </button>
+              <span class="connection-status"><i class="dot" aria-hidden="true"></i><span data-state>Disconnected</span></span>
+              <button class="connection-toggle" type="button" data-action="connection" aria-label="Disconnect socket" title="Disconnect socket">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path class="pause-icon" d="M5 3v10M11 3v10" /><path class="play-icon" d="M5 3l8 5-8 5z" /></svg>
+              </button>
               <button type="button" class="collapse" data-action="collapse" aria-label="Collapse developer tools">⌄</button>
             </header>
             <section id="cache-pane" role="tabpanel" aria-labelledby="cache-tab">
@@ -71,7 +80,7 @@ defmodule FogOfWar.DevToolsLive do
                 <p><strong>Cache</strong> shows one stored page per route. <strong>Nav</strong> shows attempts, live arrivals, cached visits and denied destinations. Events stay in memory in this document (up to 200); they are never written to localStorage and disappear on a full reload. Newest records appear first. Click a column to change sorting.</p>
                 <p><strong>Vsn</strong> is the snapshot record format, currently 1. The separate <code>build</code> value in details is a renderer compatibility tag, not the package version. Compression is a storage encoding, not another app version.</p>
                 <p>Stored sizes estimate localStorage’s UTF-16 keys and values. Clear unused preserves routes open in Fog of War tabs; it requires Web Locks. Pick content appropriate to remember on this device, and handle account changes and logout in your app.</p>
-                <p>Drag the grip to dock at a corner or edge. Corners use a compact, resizable panel; edge centers span the window. Drag the divider to resize the list. The grip, divider and resize handle also accept arrow keys. Panel layout is remembered in sessionStorage, separately from the page cache.</p>
+                <p>Drag the header to dock at a corner or the top/bottom center. Corners use a compact, resizable panel; top and bottom centers span the window. Drag the divider to resize the list. The grip, divider and resize handle also accept arrow keys. Panel layout is remembered in sessionStorage, separately from the page cache.</p>
               </div>
             </section>
             <div class="resize-handle" role="separator" aria-label="Resize developer tools" tabindex="0"></div>
