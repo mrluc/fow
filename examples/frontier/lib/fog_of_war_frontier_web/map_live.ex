@@ -31,6 +31,7 @@ defmodule FogOfWarFrontierWeb.MapLive do
   def render(assigns) do
     ~H"""
     <FogOfWar.region :if={assigns[:path]} id="frontier-map" path={@path} class="frontier">
+      <div class="game-logo" role="img" aria-label="Fog of War"></div>
       <main class="map-viewport" aria-label="The valley">
         <div id="map-scene" class="map-scene" data-lat={@lat} data-lon={@lon}>
           <div class="ground-layer" aria-hidden="true">

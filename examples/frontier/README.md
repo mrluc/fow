@@ -12,7 +12,7 @@ mix phx.server
 
 Open http://127.0.0.1:47190/lat/0/lon/0. The three neighboring public pages are preloaded from real server renders into the Fog of War cache after the initial page mounts. This is online preloading, not a bundled cold-offline first installation. Saving those neighboring pages does not change the current tab's route protection. A completed preload is marked in `frontier:seed:v2`; remove that key to repeat it.
 
-Open the floating developer tools and pause the connection. Neighboring cached locations remain navigable. Other locations are black until visited; known ground is dimmed under a grey checkerboard facing the camera. The map fills the viewport: no heading, journal, legend, logo or coordinate labels. Click an adjacent diamond to move; each diamond remains a keyboard-accessible link with a descriptive accessible name. The floating developer tools are the only surrounding UI. No database or Counter app code is used.
+Open the floating developer tools and pause the connection. Neighboring cached locations remain navigable. Other locations are black until visited; known ground is dimmed under a grey checkerboard facing the camera. The map fills the viewport: no heading, journal, legend or coordinate labels; the Fog of War logo floats in the upper-left corner. Click an adjacent diamond to move; each diamond remains a keyboard-accessible link with a descriptive accessible name. The floating developer tools are the only surrounding UI. No database or Counter app code is used.
 
 ## Terrain and artwork
 
