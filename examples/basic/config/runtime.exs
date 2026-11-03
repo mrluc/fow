@@ -28,7 +28,10 @@ if config_env() == :dev do
   config :fog_of_war_basic, FogOfWarBasicWeb.Endpoint,
     live_reload: [
       web_console_logger: true,
+      # DevTools CSS is embedded in a shadow-root template; it needs a fresh page.
+      reload_page_on_css_changes: true,
       patterns: [
+        ~r"lib/(fow\.ex|fog_of_war/.*\.(ex|heex))$"E,
         # Static assets, except user uploads
         ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
         # Router, Controllers, LiveViews and LiveComponents

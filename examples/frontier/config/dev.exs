@@ -12,6 +12,7 @@ config :fog_of_war_frontier, FogOfWarFrontierWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
+  reloadable_apps: [:fow, :fog_of_war_frontier],
   debug_errors: true,
   secret_key_base: "G6b9bs9hK7r16d4h/8kFeL/hZgVxwm/DiGMG1ON0NU/iAgeciUzDaZc91Z/w/JRn",
   watchers: [
@@ -62,3 +63,10 @@ config :phoenix_live_view,
   debug_attributes: true,
   # Enable helpful, but potentially expensive runtime checks
   enable_expensive_runtime_checks: true
+
+# Watch the local package alongside this example. Published dependencies do not need this.
+config :phoenix_live_reload, :dirs, [
+  Path.expand("..", __DIR__),
+  Path.expand("../../../lib", __DIR__),
+  Path.expand("../../../priv/static", __DIR__)
+]
