@@ -56,6 +56,34 @@ test('pointer docking, panel resize, splitter resize and viewport clamping survi
   await drag(panel.getByRole('button',{name:'Move developer tools'}),600,835);
   await expect(panel.locator('.tools')).toHaveAttribute('data-dock','bottom');
   expect((await panel.locator('.panel').boundingBox()).width).toBeGreaterThan(1150);
+  // The entire header is draggable, including controls; dragging must not click Help.
+  const help=panel.getByRole('tab',{name:'Help',exact:true});
+  const helpBox=await help.boundingBox();
+  await page.mouse.move(helpBox.x+helpBox.width/2,helpBox.y+helpBox.height/2);
+  await page.mouse.down();await page.mouse.move(600,18,{steps:8});
+  await expect(panel.locator('.dock-overlay')).toBeVisible();
+  await expect(panel.locator('[data-dock-target="top"]')).toHaveAttribute('data-active','true');
+  await expect(panel.locator('.dock-cursor')).toContainText('top · full width');
+  await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/dev-tools-docking.png')});
+  await page.mouse.up();
+  await expect(panel.locator('.tools')).toHaveAttribute('data-dock','top');
+  await expect(panel.getByRole('tab',{name:/Cache/})).toHaveAttribute('aria-selected','true');
+  await expect(panel.locator('.dock-overlay')).toBeHidden();
+  await help.click();await expect(help).toHaveAttribute('aria-selected','true');
+  await panel.getByRole('tab',{name:/Cache/}).click();
+  // Escape restores the dock and dismisses all drag affordances.
+  const header=panel.locator('header');const headerBox=await header.boundingBox();
+  await page.mouse.move(headerBox.x+headerBox.width-100,headerBox.y+15);
+  await page.mouse.down();await page.mouse.move(1170,820,{steps:8});
+  await page.keyboard.press('Escape');await page.mouse.up();
+  await expect(panel.locator('.tools')).toHaveAttribute('data-dock','top');
+  await expect(panel.locator('.dock-overlay')).toBeHidden();
+  await drag(panel.getByRole('button',{name:'Move developer tools'}),600,835);
+  const edge=panel.getByRole('separator',{name:'Resize developer tools',exact:true});
+  const edgeBox=await edge.boundingBox(),beforeHeight=await panel.locator('.panel').boundingBox();
+  expect(edgeBox.width).toBeGreaterThan(1150);expect(edgeBox.y).toBeLessThan(beforeHeight.y+3);
+  await drag(edge,600,edgeBox.y-65);
+  expect((await panel.locator('.panel').boundingBox()).height).toBeGreaterThan(beforeHeight.height+50);
   await page.locator('a[href="/counters/one"]').click();
   await expect(panel.locator('.tools')).toHaveAttribute('data-dock','bottom');
   await page.evaluate(()=>Promise.all(document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{}))));
