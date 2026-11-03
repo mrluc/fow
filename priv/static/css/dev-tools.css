@@ -68,3 +68,5 @@ tr[data-outcome="denied"] td:nth-child(2) { color:var(--color-bad); }tr[data-kin
 .connection-toggle .play-icon { display:none;fill:currentColor;stroke:none; }
 .connection-toggle[data-paused="true"] .pause-icon { display:none; }
 .connection-toggle[data-paused="true"] .play-icon { display:block; }
+
+.tools[data-semi-transparent="true"] .panel { border-color:transparent;outline:none; }
