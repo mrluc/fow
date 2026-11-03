@@ -1,6 +1,6 @@
 // Let the browser interpolate the named scout's geometry, rather than sliding the map.
 // Before/after snapshots contain different poses; CSS alternates them while it moves.
-export function createMapTransitions() {
+export function createMapTransitions(refreshViewport = () => {}) {
   let pending = null
   let current = location.pathname
   let queue = Promise.resolve()
@@ -14,11 +14,18 @@ export function createMapTransitions() {
     const changed = target !== current
     current = target
     const run = () => {
-      if (!changed || !document.getElementById('player') || !document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return update()
+      if (!changed || !document.getElementById('player') || !document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const result = update()
+        refreshViewport()
+        return result
+      }
       active?.skipTransition()
-      active = document.startViewTransition(() => {
+      active = document.startViewTransition(async () => {
         update()
+        // Flush class observers without waiting on the rendering clock.
+        await Promise.resolve()
         document.getElementById('player')?.classList.add('walking')
+        refreshViewport()
       })
       const running = active
       running.ready.catch(() => {})

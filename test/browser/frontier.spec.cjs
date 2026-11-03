@@ -26,8 +26,7 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
   await expect(page.locator('.tile-target')).toHaveCount(3);
   await expect(page.locator('.ground-layer .at-1-1')).not.toHaveClass(/fow-nav-uncached/);
   await expect(page.locator('.ground-layer .at-3-3')).toHaveClass(/fow-nav-uncached/);
-  expect(await page.locator('.ground-layer .at-1-1 .screen-fog').evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('conic-gradient');
-  expect(await page.locator('.screen-fog').first().evaluate(el=>getComputedStyle(el).transform)).toBe('none');
+  await expect(page.locator('canvas.pixel-fog')).toBeVisible();
   // Transparent diamond hit areas sit over the whole terrain, with no visible labels or page chrome.
   await expect(page.locator('#frontier-map')).toHaveText('');
   expect(await page.locator('.tile-target').first().evaluate(el => getComputedStyle(el).clipPath)).toContain('polygon');
@@ -55,4 +54,44 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
   await expect(page.locator('#player')).not.toHaveClass(/walking/);
   expect(requests).toEqual([]);expect(errors).toEqual([]);
   await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/frontier-offline.png'),fullPage:true});
+});
+
+
+test('map grows and stays centered while fog retains sharp one-pixel cells over terrain and trees', async ({page}) => {
+  await page.goto('/lat/0/lon/0');
+  await expect.poll(() => snapshotPaths(page)).toHaveLength(4);
+  const bounds = () => page.locator('.floor').evaluateAll(els => {
+    const r=els.map(el=>el.getBoundingClientRect());
+    const left=Math.min(...r.map(x=>x.left)),right=Math.max(...r.map(x=>x.right));
+    return {width:right-left,center:(left+right)/2};
+  });
+  const small=await bounds();
+  expect(Math.abs(small.center-320)).toBeLessThan(2);
+  await page.setViewportSize({width:1600,height:1000});
+  await expect.poll(async () => (await bounds()).width).toBeGreaterThan(small.width*1.5);
+  expect(Math.abs((await bounds()).center-800)).toBeLessThan(2);
+  await expect.poll(()=>page.locator('canvas.pixel-fog').evaluate(el=>el.width)).toBe(1600);
+  const pixels=()=>page.evaluate(()=>{
+    const canvas=document.querySelector('canvas.pixel-fog'),ctx=canvas.getContext('2d');
+    const a=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+    let filled=0,invalid=0,wrongParity=0;
+    for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++){
+      const alpha=a[(y*canvas.width+x)*4+3];
+      if(alpha){filled++;if(alpha!==190)invalid++;if((x+y)%2)wrongParity++;}
+    }
+    const tree=document.querySelector('.object.at-1-1 .tree').getBoundingClientRect();
+    const floor=document.querySelector('.sector.at-1-1 .floor').getBoundingClientRect();
+    let crown=0;
+    for(let y=Math.max(0,Math.ceil(tree.top));y<Math.min(canvas.height,Math.floor(floor.top));y++)
+      for(let x=Math.max(0,Math.ceil(tree.left));x<Math.min(canvas.width,Math.floor(tree.right));x++)
+        if(a[(y*canvas.width+x)*4+3])crown++;
+    return {filled,invalid,wrongParity,crown};
+  });
+  await expect.poll(async()=> (await pixels()).crown).toBeGreaterThan(100);
+  const sample=await pixels();
+  expect(sample.filled).toBeGreaterThan(1000);expect(sample.invalid).toBe(0);expect(sample.wrongParity).toBe(0);
+  await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/frontier-responsive.png')});
+  await page.setViewportSize({width:375,height:740});
+  await expect.poll(async()=>Math.abs((await bounds()).center-187.5)).toBeLessThan(2);
+  await expect.poll(async()=> (await bounds()).width).toBeLessThan(375);
 });

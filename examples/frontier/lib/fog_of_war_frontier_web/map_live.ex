@@ -47,7 +47,6 @@ defmodule FogOfWarFrontierWeb.MapLive do
               <div class="floor">
                 <span :for={tile <- 0..8} class={"terrain-tile tile-#{tile}"}></span>
               </div>
-              <div class="screen-fog"></div>
             </div>
           </div>
           <div class="objects-layer" aria-hidden="true">

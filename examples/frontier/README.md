@@ -25,3 +25,8 @@ The emblem, pine, standing scout, and walking scout are original generated PNGs 
 `assets/js/map-transitions.js` connects LiveView's document patch callback and Fog of War's cached navigation to the same View Transition API. The scout has a named view-transition element; its before/after positions interpolate across the map while CSS alternates the idle and walking snapshots. The actual scout returns to its idle pose when the transition finishes. Terrain and tile targets remain still. Reduced-motion preferences and browsers without the API apply navigation immediately. This is a simple two-pose walk, not a full directional animation set.
 
 `test/map_test.exs` checks routes, adjacency and tile counts. The package's `test/browser/frontier.spec.cjs` checks initial preloading, transitions, whole-tile navigation, fog layers, absence of page chrome, missing destinations, and immediate Back after cached moves. Neither the tests nor the app sleep to make history work.
+
+
+## Responsive map and pixel fog
+
+`assets/js/map-viewport.js` fits the map continuously to the viewport and centers its visual bounds. It keeps fog in a fixed, unscaled canvas above terrain and trees. Terrain diamonds and the pine PNG's alpha form a mask; thresholding that mask produces hard edges. The checkerboard is aligned to the viewport, with 1 CSS-pixel cells, nearest-neighbor display, and no intermediate fog alpha values. Scaling the map does not scale the checkerboard. The same compositor observes live patches, cache-state changes and cached navigation; it does not depend on mounting hooks on saved HTML.

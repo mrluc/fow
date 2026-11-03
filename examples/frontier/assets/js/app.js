@@ -1,9 +1,11 @@
+import {installMapViewport} from "./map-viewport"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {FogOfWar, installFogOfWar, FOG_OF_WAR_BUILD} from "fow"
 import {createMapTransitions} from "./map-transitions"
 
-const transitions = createMapTransitions()
+const viewport = installMapViewport()
+const transitions = createMapTransitions(viewport.refresh)
 const liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: document.querySelector("meta[name='csrf-token']").content},
   hooks: {FogOfWar}, dom: {onDocumentPatch: transitions.onDocumentPatch},
