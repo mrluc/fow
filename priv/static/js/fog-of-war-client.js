@@ -34,12 +34,10 @@ export const FogOfWar = {
     }
     try {
       const key = `fog-of-war:page:${path}`
-      const encoded = JSON.stringify(snapshot)
-      await coordinator.cache.save(snapshot)
-      const stored = localStorage.getItem(key)
-      if (stored === encoded) {
+      const stored = await coordinator.cache.save(snapshot)
+      if (localStorage.getItem(key) === stored) {
         const preview = document.getElementById("snapshot-source")
-        if (preview) preview.textContent = JSON.stringify(JSON.parse(stored), null, 2)
+        if (preview) preview.textContent = JSON.stringify(snapshot, null, 2)
         const status = document.getElementById("snapshot-status")
         if (status) status.textContent = `Snapshot saved · ${path} · ${FOG_OF_WAR_BUILD}`
       }

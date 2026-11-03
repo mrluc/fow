@@ -67,8 +67,8 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
       subscribers.forEach(fn => fn(status))
     }
   }
-  const lookup = url => {
-    try { return cache.find(url) } catch (_) { return null }
+  const lookup = async url => {
+    try { return await cache.load(url) } catch (_) { return null }
   }
   const enterSnapshotMode = () => {
     const main = document.querySelector('[data-phx-main]')
@@ -90,9 +90,12 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     main.replaceWith(page)
     snapshotMode = true
   }
+  let navigation = 0
   const navigate = async (url, historyAction = 'push') => {
+    const attempt = ++navigation
     await cache.protect(url.pathname)
-    const snapshot = lookup(url)
+    const snapshot = await lookup(url)
+    if (attempt !== navigation || !offline()) return true
     if (!snapshot) {
       await cache.protect(new URL(displayedURL).pathname)
       message = 'This page is not available offline; it has not been saved.'
@@ -116,6 +119,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     return true
   }
   const toggleConnection = () => {
+    navigation++
     if (offline() && snapshotMode) {
       location.assign(location.href)
       return

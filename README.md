@@ -260,3 +260,9 @@ liveSocket.connect()
 Give the moving content a CSS `view-transition-name`. The Counter example's stylesheet demonstrates left/right animation using `html[data-fog-of-war-direction="forward"]` and `"back"`, leaving its header and developer tools fixed. Previously visited routes determine direction; a newly visited shallower route is treated as back. Ordinary events on the same route do not animate. Unsupported browsers and reduced-motion preferences use immediate updates. This is a navigation animation, not an interactive finger-tracked swipe gesture.
 
 For non-link navigation decoration, `class="fow-nav" data-fog-of-war-to="/destination"` explicitly supplies a destination; the Frontier map uses this for sectors that currently have no direct travel link. This attribute controls styling, not navigation permission.
+
+## Compressed browser storage
+
+New snapshots gzip their HTML and store it as base64 in localStorage, leaving route, build, title and timestamp metadata readable. Compression is used only when the complete encoded record is smaller. Existing uncompressed snapshots remain readable and are replaced on the next successful capture. Browsers without the native compression/decompression APIs continue saving plain HTML.
+
+Compression/decompression is asynchronous and uses the browser's built-in streams; no extra JavaScript dependency is required. Writes preserve capture order. Offline presentation decompresses the saved HTML before restoring it, and the developer tools report the size actually stored, including base64 and metadata overhead. The snapshot inspector continues showing decoded HTML. Compression reduces storage; it does not encrypt cached content.

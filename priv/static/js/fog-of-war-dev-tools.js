@@ -21,7 +21,7 @@ function mountDevTools(el, coordinator) {
     node.title = text
     node.dataset.kind = kind
   }
-  const select = key => {
+  const select = async key => {
     selected = key
     root.querySelectorAll('tbody tr').forEach(row => { row.dataset.selected = String(row.dataset.key === key) })
     const entry = rows.find(row => row.key === key)
@@ -29,9 +29,19 @@ function mountDevTools(el, coordinator) {
       get('[data-detail]').textContent = 'Select a page to inspect its metadata and HTML.'
       return
     }
-    const {html, ...metadata} = entry.snapshot || {}
-    get('[data-detail]').textContent = JSON.stringify({key: entry.key, storageBytes: entry.bytes,
-      openInTab: entry.open, ...metadata}, null, 2) + '\n\n' + (html || entry.raw)
+    const {html, htmlGzip, ...metadata} = entry.snapshot || {}
+    const header = JSON.stringify({key: entry.key, storageBytes: entry.bytes,
+      openInTab: entry.open, ...metadata}, null, 2) + '\n\n'
+    get('[data-detail]').textContent = header + (html || 'Decoding saved HTML…')
+    if (!html) {
+      try {
+        const snapshot = await coordinator.cache.decode(entry.snapshot)
+        if (selected === key && rows.find(row => row.key === key)?.raw === entry.raw)
+          get('[data-detail]').textContent = header + snapshot.html
+      } catch (_) {
+        if (selected === key) get('[data-detail]').textContent = header + 'Saved HTML is unreadable.'
+      }
+    }
   }
   const refreshCache = async () => {
     const version = ++refreshVersion

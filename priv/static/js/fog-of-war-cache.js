@@ -1,3 +1,24 @@
+// Keep route metadata readable, compress only the repetitive HTML payload.
+async function encodeSnapshot(snapshot) {
+  const plain = JSON.stringify(snapshot)
+  if (typeof CompressionStream === 'undefined' || typeof DecompressionStream === 'undefined') return plain
+  const input = new TextEncoder().encode(snapshot.html)
+  const bytes = new Uint8Array(await new Response(new Blob([input]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer())
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  const {html, ...metadata} = snapshot
+  const packed = JSON.stringify({...metadata, htmlEncoding:'gzip-base64', htmlBytes:input.length, htmlGzip:btoa(binary)})
+  return packed.length < plain.length ? packed : plain
+}
+
+async function decodeSnapshot(snapshot) {
+  if (typeof snapshot.html === 'string') return snapshot
+  const bytes = Uint8Array.from(atob(snapshot.htmlGzip), c => c.charCodeAt(0))
+  const html = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text()
+  const {htmlEncoding, htmlGzip, htmlBytes, ...metadata} = snapshot
+  return {...metadata, html}
+}
+
 const PREFIX = 'fog-of-war:page:'
 const OPEN = 'fog-of-war:open:'
 const MAINTENANCE = 'fog-of-war:cache-maintenance'
@@ -9,6 +30,7 @@ export function createFogOfWarCache(build) {
   let heldPath, releasePath
   let protection = Promise.resolve()
   let lockError = null
+  let writes = Promise.resolve()
   const locks = navigator.locks
   const supported = Boolean(locks?.request && locks?.query)
   const listeners = new Set()
@@ -21,7 +43,8 @@ export function createFogOfWarCache(build) {
     const raw = localStorage.getItem(key) || ''
     let snapshot
     try { snapshot = JSON.parse(raw) } catch (_) { /* Keep corrupt entries visible, never guess their route. */ }
-    const valid = snapshot && typeof snapshot.path === 'string' && snapshot.path.startsWith('/') && typeof snapshot.html === 'string'
+    const valid = snapshot && typeof snapshot.path === 'string' && snapshot.path.startsWith('/') && (typeof snapshot.html === 'string' ||
+      (snapshot.htmlEncoding === 'gzip-base64' && typeof snapshot.htmlGzip === 'string' && typeof DecompressionStream !== 'undefined'))
     return {key, raw, snapshot, valid: Boolean(valid), path: valid ? snapshot.path : '(unreadable)',
       bytes: 2 * (key.length + raw.length)}
   }).sort((a, b) => a.path.localeCompare(b.path) || a.key.localeCompare(b.key))
@@ -51,20 +74,30 @@ export function createFogOfWarCache(build) {
 
   return {
     protect,
-    async save(snapshot, {protectRoute = true} = {}) {
-      if (protectRoute) await protect(snapshot.path)
-      const write = () => {
-        const key = `${PREFIX}${snapshot.path}`
-        // Element IDs and build IDs describe content; they aren't cache identities.
-        // A successful live render replaces the route's previous public/local value.
-        localStorage.setItem(key, JSON.stringify(snapshot))
-        for (const row of entries()) {
-          if (row.valid && row.path === snapshot.path && row.key !== key) localStorage.removeItem(row.key)
+    save(snapshot, {protectRoute = true} = {}) {
+      const job = writes.then(async () => {
+        if (protectRoute) await protect(snapshot.path)
+        const encoded = await encodeSnapshot(snapshot)
+        const write = () => {
+          const key = `${PREFIX}${snapshot.path}`
+          localStorage.setItem(key, encoded)
+          for (const row of entries()) {
+            if (row.valid && row.path === snapshot.path && row.key !== key) localStorage.removeItem(row.key)
+          }
         }
-      }
-      if (supported && !lockError) await locks.request(MAINTENANCE, write)
-      else write()
-      changed()
+        if (supported && !lockError) await locks.request(MAINTENANCE, write)
+        else write()
+        changed()
+        return encoded
+      })
+      // Compression is async; preserve capture order even when views update rapidly.
+      writes = job.catch(() => {})
+      return job
+    },
+    decode: decodeSnapshot,
+    async load(url) {
+      const snapshot = this.find(url)
+      return snapshot ? decodeSnapshot(snapshot) : null
     },
     find(url) {
       if (url.origin !== location.origin || url.search) return null
