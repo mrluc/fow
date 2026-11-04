@@ -296,7 +296,7 @@ defmodule FogOfWar.Wrapper.Export do
 
         urls =
           if Path.extname(path) == ".css" do
-            Regex.scan(~r/(?:url\(\s*|@import\s+)["']?([^\s"'\)]+)["']?\s*\)?/, data)
+            Regex.scan(~r/(?:url\(\s*|@import\s+(?!url\s*\())["']?([^\s"'\)]+)["']?\s*\)?/, data)
             |> Enum.map(fn [_, ref] -> URI.merge("http://local" <> path, ref) end)
             |> Enum.filter(&(&1.host == "local"))
             |> Enum.map(& &1.path)

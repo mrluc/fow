@@ -70,6 +70,47 @@ defmodule FogOfWar.WrapperTest do
     end
   end
 
+  test "CSS imports using url() and quoted paths are exported recursively", context do
+    %{root: root, manifest: manifest, html: html} = context
+
+    File.write!(
+      Path.join(root, "priv/static/css/site.css"),
+      "@import url('/css/terrain.css'); @import \"detail.css\";"
+    )
+
+    for name <- ["terrain.css", "detail.css"],
+        do: File.write!(Path.join(root, "priv/static/css/" <> name), "body {color: green}")
+
+    bundle =
+      Export.run!(manifest, root, Path.join(root, "public"),
+        fetch: fn url -> for_path(html, url) end
+      )
+
+    assert Map.has_key?(bundle["assets"], "/css/terrain.css")
+    assert Map.has_key?(bundle["assets"], "/css/detail.css")
+  end
+
+  test "desktop live startup opens the configured route and includes native icon paths",
+       context do
+    %{root: root, manifest: manifest, html: html} = context
+    manifest = put_in(manifest, ["elixirkit", "startup"], "live")
+
+    Export.run!(manifest, root, Path.join(root, "public"),
+      fetch: fn url -> for_path(html, url) end
+    )
+
+    Manifest.write!(Path.join(root, ".fow.json"), manifest)
+    output = Path.join(root, "live-desktop")
+    Generator.run!(:elixirkit, Path.join(root, ".fow.json"), output)
+    assert File.read!(Path.join(output, "src-tauri/src/main.rs")) =~ "WebviewUrl::External(live)"
+    config = File.read!(Path.join(output, "src-tauri/tauri.conf.json")) |> Jason.decode!()
+    assert "icons/icon.icns" in config["bundle"]["icon"]
+
+    assert_raise Mix.Error, ~r/elixirkit.startup/, fn ->
+      Manifest.validate!(put_in(manifest, ["elixirkit", "startup"], "typo"))
+    end
+  end
+
   test "a generated desktop contains public artifacts and standalone code, never source Phoenix app",
        %{root: root, manifest: manifest, html: html} do
     Export.run!(manifest, root, Path.join(root, "public"),

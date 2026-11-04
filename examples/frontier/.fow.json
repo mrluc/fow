@@ -1,0 +1,46 @@
+{
+  "schema": 2,
+  "default_env": "dev",
+  "envs": {
+    "dev": {}
+  },
+  "app": {
+    "name": "Frontier",
+    "slug": "frontier",
+    "identifier": "dev.fogofwar.frontier",
+    "version": "0.1.0",
+    "icon": "priv/static/images/fog-of-war-logo.png"
+  },
+  "web": {
+    "origin": "http://127.0.0.1:47190",
+    "start_path": "/lat/0/lon/0",
+    "endpoint": "FogOfWarFrontierWeb.Endpoint",
+    "router": "FogOfWarFrontierWeb.Router"
+  },
+  "public": {
+    "paths": [
+      "/lat/0/lon/0",
+      "/lat/0/lon/1",
+      "/lat/1/lon/0",
+      "/lat/1/lon/1"
+    ],
+    "static_root": "priv/static",
+    "bundle": ".fow/public",
+    "asset_directories": [
+      "assets",
+      "css",
+      "images"
+    ]
+  },
+  "elixirkit": {
+    "width": 1200,
+    "height": 900,
+    "startup": "live"
+  },
+  "mob": {
+    "platforms": [
+      "android",
+      "ios"
+    ]
+  }
+}

@@ -33,7 +33,8 @@ defmodule FogOfWar.Wrapper.Generator do
       live: manifest["web"]["origin"] <> manifest["web"]["start_path"],
       live_json: Jason.encode!(manifest["web"]["origin"] <> manifest["web"]["start_path"]),
       width: get_in(manifest, ["elixirkit", "width"]) || 1060,
-      height: get_in(manifest, ["elixirkit", "height"]) || 760
+      height: get_in(manifest, ["elixirkit", "height"]) || 760,
+      desktop_startup: get_in(manifest, ["elixirkit", "startup"]) || "bundled"
     ]
 
     try do
@@ -279,7 +280,7 @@ defmodule FogOfWar.Wrapper.Generator do
         "active" => true,
         "targets" => ["app"],
         "resources" => %{"target/rel" => "rel"},
-        "icon" => []
+        "icon" => ["icons/icon.icns", "icons/icon.png"]
       }
     }
 
@@ -355,7 +356,7 @@ defmodule FogOfWar.Wrapper.Generator do
     """
     # #{a[:name]} — #{target} wrapper
 
-    Generated from `.fow.json` and an explicitly public HTML bundle. No source Phoenix application, database, credentials or signed LiveView session is embedded. The app serves its read-only public pages at a loopback origin; the real website stays at #{a[:origin]}. Open live site loads that website. This is a starting point, not an authentication implementation.
+    Generated from `.fow.json` and an explicitly public HTML bundle. No source Phoenix application, database or logged-in user session is embedded. The app serves its read-only public pages at a loopback origin; the real website stays at #{a[:origin]}. #{if target == :elixirkit && a[:desktop_startup] == "live", do: "This desktop build opens the real website directly; the server must be reachable on launch. Bundled-first seamless recovery is not enabled in this mode.", else: "Open live site loads that website."} This is a starting point, not an authentication implementation.
 
     #{build}
 

@@ -200,6 +200,9 @@ defmodule FogOfWar.Wrapper.Manifest do
         do: Mix.raise("elixirkit.#{key} must be 240..4096")
     end
 
+    unless (get_in(manifest, ["elixirkit", "startup"]) || "bundled") in ["bundled", "live"],
+      do: Mix.raise("elixirkit.startup must be bundled or live")
+
     if app["icon"], do: relative_path!(app["icon"])
     %{manifest | "web" => Map.put(web, "origin", origin)}
   end

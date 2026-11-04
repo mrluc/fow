@@ -30,3 +30,22 @@ The emblem, pine, standing scout, and walking scout are original generated PNGs 
 ## Responsive map and pixel fog
 
 `assets/js/map-viewport.js` fits the map continuously to the viewport and centers its visual bounds. It keeps fog in a fixed, unscaled canvas above terrain and trees. Terrain diamonds and the pine PNG's alpha form a mask; thresholding that mask produces hard edges. The checkerboard is aligned to the viewport, with 1 CSS-pixel cells, nearest-neighbor display, and no intermediate fog alpha values. Scaling the map does not scale the checkerboard. The same compositor observes live patches, cache-state changes and cached navigation; it does not depend on mounting hooks on saved HTML.
+
+## macOS app: Frontier
+
+`.fow.json` names the app **Frontier**, uses the same Fog of War logo as its launcher icon, and selects the four initial public coordinates. `elixirkit.startup: "live"` opens the map directly, without an intermediate public-shell page or an “Open live site” button. This development build connects to `http://127.0.0.1:47190`; keep the Frontier Phoenix server running. This mode needs the server on launch. Cached navigation works after loading, but seamless bundled-first offline launch is a separate startup mode still to be implemented.
+
+With the server running, from this example directory:
+
+```sh
+mix fow.export
+mix fow.gen.elixirkit
+cd .fow/apps/elixirkit/dev
+./build.sh
+```
+
+Export and generation refuse to overwrite their existing output folders. Rename or remove only those generated folders when regenerating. Build uses the normal desktop toolchain; the repository's `elixir-client/env.sh` selects the shared native compilation cache on this development machine.
+
+The resulting `Frontier.app` is under `$CARGO_TARGET_DIR/release/bundle/macos/` (or the generated project's `src-tauri/target/release/bundle/macos/` without that environment variable). Copy it into `~/Applications` to launch it from Spotlight. It is locally signed for development, not notarized for distribution.
+
+From the package root, `node test/native/frontier-smoke.cjs` tests the actual generated desktop app's terrain, logo loading, IndexedDB cache, offline movement, denied uncached movement, and Back navigation. It temporarily injects a test driver, then restores the source and rebuilds the ordinary app before returning.

@@ -191,3 +191,7 @@ With four Counter routes, the cache export held 2,385 gzip payload bytes. Deskto
 
 
 The client now exposes `coordinator.cache.importBundle(indexURL, options)` for these gzip files. It imports into IndexedDB in resumable batches and preserves compatible device captures. See the README for the API and native `readAsset` bridge. The generated wrappers still use their older startup/seed mechanism; automatic native-host integration is a separate step. The macOS native smoke test exercises the new importer in an actual ElixirKit/Tauri WebView without claiming that the production generator already performs that integration.
+
+### Direct desktop launch
+
+Set `elixirkit.startup` to `"live"` to open `web.origin + web.start_path` directly in the desktop window. The default `"bundled"` retains the earlier public-shell prototype. Direct launch needs the configured server to be reachable at startup; it does not implement the bundled-first automatic recovery described in the ADR. Frontier's `.fow.json` demonstrates this development configuration. Desktop builds now explicitly include the generated `.icns` and PNG files in their bundle icon configuration.
