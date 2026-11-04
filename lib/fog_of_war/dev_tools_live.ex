@@ -32,7 +32,7 @@ defmodule FogOfWar.DevToolsLive do
                 <button type="button" role="tab" id="cache-tab" aria-controls="cache-pane"
                   aria-selected="true" data-tab="cache">Cache <span data-count>0</span></button>
                 <button type="button" role="tab" id="help-tab" aria-controls="help-pane"
-                  aria-selected="false" tabindex="-1" data-tab="help">Help</button>
+                  aria-selected="false" tabindex="-1" data-tab="help">What's This?</button>
               </div>
               <button class="transparency-toggle" type="button" data-action="transparency" aria-label="Semi-transparent developer tools" aria-pressed="false" title="Toggle semi-transparent developer tools">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="9" height="9" rx="1" /><rect x="6" y="6" width="8" height="8" rx="1" /></svg>
@@ -72,8 +72,81 @@ defmodule FogOfWar.DevToolsLive do
             </section>
             <section id="help-pane" role="tabpanel" aria-labelledby="help-tab" hidden>
               <div class="help-copy">
-                <h2>A website that remembers what you saw</h2>
-                <p>LiveView keeps the working app on the server. It sends the browser HTML, then small updates as things change. That is server-driven UI: one place describes the screen and handles its actions.</p>
+
+                <h1>Fog of War</h1>
+                <h2>Declarative offline for LiveView</h2>
+
+                <p style="zoom: 1.1;">
+                  <a href="#liveview">LiveView is great.</a>
+                  <a href="#offline">Offline is also great.</a>
+                  <a href="#fow">Fog of War is an approach to give us offline</a>
+                  that can work for a wide variety of apps, very easily.
+                </p>
+
+                <h2 id="liveview">LiveView is Great</h2>
+                <p>
+                  LiveView is great. Most apps that do something
+                  interesting are online, and have non-trivial server code.
+                  And LiveView is the best way to make interesting apps.
+                </p>
+
+                <p>
+                  But you used to be forced to split the program
+                  up. For instance, when they pick a username, and you
+                  automatically check to see if that name's
+                  available as they're typing, you
+                  need a separate little program, running in the browser.
+                </p>
+
+                <p>
+                  Not a big deal at first, but you wouldn't believe
+                  just how fragmented programs ended up.
+                </p>
+
+                <p>
+                  Especially from about 2010-2020. Eventually, billion-dollar
+                  startups were created whose sole reason to exist
+                  was, basically, to paper this over that mess.
+                </p>
+
+                <p>
+                  So, LiveView is great. No split brain, and you can drive any
+                  complex client-side behavior you want from the server.
+                </p>
+
+                <h2 id="offline">Offline is great</h2>
+
+                <p>
+                  If you care about the user experience, and especially if you
+                  want to wrap it in a mobile app, you need to think about offline behavior.
+                  <a href="#fn1" class="fn">[1]</a>
+                </p>
+
+                <p id="fn1" class="fn-text">
+                  There are those who will say that, if you care about
+                  the user experience, you cannot possibly use web technologies
+                  extensively in a mobile application. They are not usually saying it
+                  because they believe it to be strictly true, but for other reasons.
+                </p>
+
+                <p>
+                  If you install an app from an App Store, and then open it offline,
+                  it is reasonable to expect that it shows a user a screen that is
+                  ready to use, not a spinner. This is even true if that screen
+                  requires you to sign in or sign up, and that
+                  step will not work because you're offline.
+                </p>
+
+                <p>
+                  Similarly, some screens in an app really require being online.
+                  Performing a search for vacation rentals, for instance. But
+                  much navigation should still be possible even when offline.
+                  The creator of the app knows what screens make sense to
+                  have cached and available for navigation locally, and which
+                  ones need to show a graceful offline indication.
+                </p>
+
+                <h3 id="fow">Fog of War is offline support via simple caching</h3>
                 <p>Fog of War remembers the pages you choose. Lose contact with the server and you can still visit those remembered pages. Like an explored part of a game map, they show what was there the last time you looked. Unvisited places stay unavailable.</p>
                 <h3>Why this fits LiveView</h3>
                 <p>The server already produces the screen. We save that HTML rather than build a second offline version of the app or copy its database into the browser. Add one hook to a page’s top-level content; keep using LiveView online.</p>

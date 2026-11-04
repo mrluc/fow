@@ -1,0 +1,11 @@
+/* Frontier-only camera settings. Below 800px, keep the art large and allow panning. */
+.map-viewport .map-scene {
+  --narrow-map-zoom: 1.65;
+  transform: translate(var(--camera-x, 0px), var(--camera-y, 0px)) scale(var(--map-scale, 1));
+}
+@media (max-width: 799px) {
+  .map-viewport { touch-action: none; user-select: none; cursor: grab; }
+  .map-viewport.is-panning, .map-viewport.is-panning .tile-target { cursor: grabbing; }
+  .map-viewport.pannable .map-scene { view-transition-name: frontier-world; }
+}
+::view-transition-group(frontier-world) { animation-duration: 650ms; animation-timing-function: linear; }

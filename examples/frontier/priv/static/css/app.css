@@ -1,4 +1,5 @@
 @import url('/css/terrain.css');
+@import url('/css/camera.css');
 /* Frontier: painted sprites over procedural earth. Terrain, objects and tile targets have
  * independent depth layers; the fog pattern is deliberately aligned to the screen. */
 :root { color-scheme: dark; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; --paper: #20261d; --ink: #e3dfbf; --muted: #9da58a; --line: #444c35; --accent: #ddbf72; background: #11160f; color: var(--ink); }
@@ -30,15 +31,19 @@
 
 /* Logo sizing: edit these three viewport shares and the optional desktop cap. */
 :root {
-  --game-logo-width: 40vw; /* Narrow/mobile: 40% of the viewport width. */
+  --game-logo-width: 50vw; /* Narrow/mobile: 40% of the viewport width. */
   --game-logo-max-width: 400px;
 }
+
+/*
 @media (min-width: 600px) {
-  :root { --game-logo-width: 25vw; } /* Medium: 25%. */
+  :root { --game-logo-width: 25vw; }
 }
+*/
 @media (min-width: 1200px) {
-  :root { --game-logo-width: 20vw; } /* Wide: 20%. */
+  :root { --game-logo-max-width: 500px; }
 }
+
 .game-logo {
   position: fixed;
   top: clamp(10px, 1.5vw, 24px);

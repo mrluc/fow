@@ -1,13 +1,14 @@
 defmodule <%= @module %>.HomeScreenTest do
-  use Mob.ScreenCase, async: false
-  setup do
-    start_supervised!(<%= @module %>.PublicShell)
-    :ok
-  end
-  test "starts with the bundled public site and renders a native WebView" do
-    view = mount_screen(<%= @module %>.HomeScreen)
-    assert assigns(view).url =~ "http://127.0.0.1:"
-    assert <%= inspect(@origin <> "/") %> in assigns(view).allowed
-    assert_renderable(view)
+  use ExUnit.Case, async: false
+  for platform <- <%= inspect(Enum.map(@mobile_platforms, fn platform -> if platform == "android", do: :android, else: :ios end)) %> do
+    test "mount selects the #{platform} bundle at the real website URL" do
+      platform = unquote(platform)
+      socket = Mob.Socket.new(<%= @module %>.HomeScreen, platform: platform)
+      assert {:ok, socket} = <%= @module %>.HomeScreen.mount(%{}, %{}, socket)
+      assert socket.assigns.url == <%= inspect(@live) %>
+      assert <%= inspect(@origin <> "/") %> in socket.assigns.allowed
+      assert socket.assigns.bundle["platform"] == Atom.to_string(platform)
+      assert File.regular?(socket.assigns.bundle["startup"])
+    end
   end
 end

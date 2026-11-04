@@ -50,25 +50,24 @@ The output is `index.json`, `startup.html` (the selected start path's complete, 
 
 `--debug` additionally retains per-route request method/URL, complete response HTML, and extracted region HTML under `debug/<route-sha256>/`. Debug HTML and `startup.html` can contain anonymous LiveView bootstrap values from the public response; no response cookies or browser state are exported. The standalone cache task does **not** collect assets: it produces records and the initial document for the next loader/import stage. The full public exporter retains its existing allowlisted asset-copy behavior, which uses the local project's static files; matching deployment assets are required when exporting a deployed site.
 
-### Keep existing source generation working
+### Generate source without native compilation
+
+Desktop generation still uses the legacy full export. Mobile generation now uses the prepared executable bundles and the separate Mob WebView plugin:
 
 ```sh
 mix fow.export --env dev
 mix fow.gen.elixirkit --env dev
+
+mix fow.bundle.prepare --env dev --platform android
+mix fow.bundle.prepare --env dev --platform ios
 mix fow.gen.mob --env dev
 ```
 
-The full exporter still produces the legacy public shell and now also places the binary record export under `cache/`. Both native generators copy that cache index, startup document, and listed payloads into their app resources using an explicit file allowlist. This preserves existing shell behavior while providing the new artifacts for the future IndexedDB importer. **Neither IndexedDB import nor seamless native cold-start handoff is implemented by these tasks yet.** The legacy sanitized shell remains separate from the complete startup response stored under `cache/startup.html`.
+Prepare only the platforms listed in `mob.platforms`; omitted `mob.platforms` defaults to Android and iOS. Mobile inputs live under `.fow/native/<env>/<platform>`, with `.fow/native/default` used for old flat manifests without an environment. `--bundle-dir` selects another parent folder containing the platform folders. The mobile generator copies only files declared in each native allowlist, rejects an environment/origin/public-path mismatch, and preserves separate Android and Apple startup/asset representations. Its generated screen loads the matching platform bundle at the real website URL. FoW's browser code imports the gzip records into IndexedDB in batches before using them for offline navigation.
 
-Generating a source wrapper does not compile Rust, install mobile SDKs, download simulator images, or build native dependencies. The Mob generator invokes `mob.new --no-install` and requires the existing `mob_new` archive. The later `build.sh` step is the expensive native build. Do not use generation success as evidence that an iOS/Android/desktop binary was built or tested.
+The WebView defaults to the dedicated repository `git@github.com:mrluc/fow_webview_mob.git`, pinned to a full commit in the generated `mix.exs`. It is private during development, so builders need SSH access. For local WebView development use `--webview-path /absolute/path/to/mob_webview`. To choose another repository use `--webview-git URL --webview-ref FULL_COMMIT_SHA`. The same source can be set in the manifest as `mob.webview: {"path": "../mob_webview"}` or `mob.webview: {"git": "git@github.com:owner/repo.git", "ref": "full commit SHA"}`; paths resolve relative to the manifest. A local path and a Git source are mutually exclusive. Once the repository is public, `--webview-git https://github.com/mrluc/fow_webview_mob.git --webview-ref 1be07da3604a64bc6ef11c87858c3c9ad372e80b` allows an HTTPS source. No unpublished Hex version is assumed.
 
-
-
-**Startup design under revision:** the manual “Open live site” flow below is a prototype and does not meet the seamless-startup requirement. [ADR 0001](docs/adr/0001-seamless-public-startup-recovery.md) defines the proposed automatic recovery contract and the platform tests required before rollout. Its configuration is proposed, not implemented.
-
-The generators make small native hosts for an existing website. They do not package its Phoenix server. Both targets consume the same reviewable `.fow.json` and explicitly public HTML export. The desktop target uses ElixirKit with a Tauri WebView. The mobile target uses Mob's existing native WebView component.
-
-This is an experimental first pass. The generated macOS ARM64 Counter app has built and opened its bundled public site. The Mob project compiles, its screen test passes, and its Android/iOS document-start patches apply repeatedly; this new wrapper has not yet been run on a device or emulator. No app-store or production authentication claim is implied.
+These commands generate source; they do not compile SDK/native binaries. The generated Mob project activates the WebView plugin and explicitly acknowledges the inspected unsigned prototype. Production distribution should sign and trust it. Android cold-offline startup and recovery are device-tested; the Apple implementation still has SDK compile checks only.
 
 ## Two addresses, two jobs
 
@@ -145,7 +144,7 @@ mix fow.gen.mob --output ../counter-mobile
 
 Both tasks accept `--manifest path/to/.fow.json`. They refuse existing output folders unless `--force` is passed. With `--force`, the entire old output is replaced only after generation succeeds in a temporary sibling directory; custom changes and downloaded/build dependencies in that output are discarded. Source-project, home/root/ancestor and symlink destinations are rejected. The manifest's bundle path is resolved relative to its own directory; output paths are relative to the command's working directory. Generated applications are independent projects and do not depend on `:fow` or the source Phoenix app. Commit the new hosts and their lockfiles after resolving/building them.
 
-The Mob generator requires the upstream `mob_new` archive once (`mix archive.install hex mob_new`). It invokes `mix mob.new --blank --no-install` internally and writes the small wrapper screen, startup, public server, native patch script and build script. Users do not run the scaffold generator or write WebView bridge code for each site. ElixirKit generation writes its small Tauri host directly; no Tauri scaffold generator is needed.
+The Mob generator requires the upstream `mob_new` archive once (`mix archive.install hex mob_new`). It invokes `mix mob.new --blank --no-install` internally and writes the seamless wrapper screen, startup and build script. Native WebView registration and asset serving belong to the separate plugin; no built-in Mob WebView patch is generated. Users do not run the scaffold generator or write WebView bridge code for each site. ElixirKit generation writes its small Tauri host directly; no Tauri scaffold generator is needed.
 
 ```sh
 cd ../counter-desktop
@@ -161,7 +160,7 @@ cd ../counter-mobile
 ./build.sh --ios
 ```
 
-The mobile script fetches dependencies, runs Mob's installation step, applies the native document-start integration and invokes Mob's native deployment. It needs Android SDK/NDK/JDK or Xcode and a compatible simulator/device. Installation can download large OTP runtimes. The icon source is copied to `branding/source.*`; mobile launchers retain Mob's default artwork until applying it with Mob's documented `mix mob.icon` workflow (requires its Image dependency). Desktop artwork is applied by the generated build script.
+The mobile script fetches dependencies, runs Mob's installation step and invokes Mob's native deployment with the WebView plugin. It needs Android SDK/NDK/JDK or Xcode and a compatible simulator/device. Installation can download large OTP runtimes. The icon source is copied to `branding/source.*`; mobile launchers retain Mob's default artwork until applying it with Mob's documented `mix mob.icon` workflow (requires its Image dependency). Desktop artwork is applied by the generated build script.
 
 For this workspace's running Counter demo, the manifest uses `http://127.0.0.1:47180`. Android needs `adb reverse tcp:47180 tcp:47180` to reach the developer machine at that address. Distribution should use a reachable HTTPS origin. The bundled shell works independently of that connection.
 
@@ -228,7 +227,7 @@ The output contains executable `startup.html`, metadata-only `index.json`, separ
 
 The separate `mob_webview` package accepts `bundle: MobWebView.Bundle.load!(root)` alongside `url: bundle["url"]`. Copy the prepared directory to the generated host's `priv` directory and resolve its on-device application path. Native code reads only declared files. The initial document is supplied once; later document navigations reach the website, allowing LiveView to renew stale bootstrap state. The existing gzip importer seeds IndexedDB in batches and preserves newer device captures. A small startup configuration is present in the HTML, not the region payloads.
 
-The existing ejected Android test host in `examples/wrappers/mob` now opens `CountersMobile.FrontierScreen` without native Live/Offline buttons or the legacy shell. Its historical application identifier stays unchanged so the installed ARM64 build can be reused. The Counter Phoenix example is unchanged. The general mobile generator still emits the older shell; switching its template to this tested path is a separate follow-up.
+The existing ejected Android test host in `examples/wrappers/mob` now opens `CountersMobile.FrontierScreen` without native Live/Offline buttons or the legacy shell. Its historical application identifier stays unchanged so the installed ARM64 build can be reused. The Counter Phoenix example is unchanged. The general mobile generator now emits this same bundle API and seamless screen, with a bundle per selected platform.
 
 After preparing an Android bundle and copying it to that host's `priv/frontier`, deploy with Mob's existing native deployment command. Run the repeatable device test from the host:
 

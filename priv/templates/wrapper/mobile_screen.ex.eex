@@ -1,25 +1,16 @@
 defmodule <%= @module %>.HomeScreen do
   use Mob.Screen
-  @live <%= inspect(@live) %>
   def mount(_, _, socket) do
-    local = <%= @module %>.PublicShell.url()
-    {:ok, Mob.Socket.assign(socket, url: local, local: local,
-      allowed: [URI.to_string(%{URI.parse(local) | path: "/"}), <%= inspect(@origin <> "/") %>])}
+    platform = Atom.to_string(socket.__mob__.platform)
+    bundle = Application.app_dir(:<%= @app %>, "priv/fog_of_war/" <> platform) |> MobWebView.Bundle.load!()
+    {:ok, Mob.Socket.assign(socket, bundle: bundle, url: bundle["url"], allowed: [<%= inspect(@origin <> "/") %>])}
   end
   def render(assigns) do
     ~MOB"""
     <Column fill_width={true} fill_height={true}>
-      <Row padding={6} gap={8}>
-        <Text text={<%= inspect(@name) %>} weight={1} />
-        <Button text="Live" on_tap={{self(), :live}} />
-        <Button text="Offline" on_tap={{self(), :offline}} />
-      </Row>
-      <WebView id="site" url={@url} allow={@allowed} show_url={false} weight={1} />
+      {MobWebView.view(id: :site, url: @url, bundle: @bundle, allow: @allowed, fill_width: true, fill_height: true)}
     </Column>
     """
   end
-  def handle_info({:tap, :live}, socket), do: {:noreply, navigate(socket, @live)}
-  def handle_info({:tap, :offline}, socket), do: {:noreply, navigate(socket, socket.assigns.local)}
   def handle_info(_, socket), do: {:noreply, socket}
-  defp navigate(socket, url), do: Mob.WebView.eval_js(socket, "location.assign(" <> Jason.encode!(url) <> ")")
 end

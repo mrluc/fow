@@ -1,3 +1,5 @@
+import {createMapCamera} from './map-camera'
+
 // Screen-space fog deliberately lives outside the scaled/live-patched map.
 // Its 1 CSS-pixel cells never grow with terrain or rotate with the ground.
 export function installMapViewport() {
@@ -14,6 +16,7 @@ export function installMapViewport() {
     scheduled = true
     requestAnimationFrame(() => { scheduled = false; draw() })
   }
+  const camera = createMapCamera(schedule)
   for (const image of [pine, idle, walking]) image.onload = schedule
   const asset = path => window.__fogOfWarNativeBundle?.assets?.[path] || path
   for (const image of [pine, idle, walking]) image.crossOrigin = 'anonymous'
@@ -24,11 +27,7 @@ export function installMapViewport() {
   function draw() {
     const scene = document.getElementById('map-scene')
     const width = innerWidth, height = innerHeight
-    if (scene) {
-      const scale = Math.max(.25, Math.min((width - 48) / 560, (height - 80) / 360, 4))
-      const value = scale.toFixed(4)
-      if (scene.style.getPropertyValue('--map-scale') !== value) scene.style.setProperty('--map-scale', value)
-    }
+    if (scene) camera.update(scene, width, height)
     if (overlay.width !== width || overlay.height !== height) {
       overlay.width = mask.width = width
       overlay.height = mask.height = height
