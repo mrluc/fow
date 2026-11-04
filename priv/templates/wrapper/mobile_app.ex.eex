@@ -10,5 +10,6 @@ defmodule <%= @module %>.App do
       {:error, {:already_started, _}} -> :ok
     end
     Mob.Screen.start_root(<%= @module %>.HomeScreen)
+    Mob.Dist.ensure_started(node: :"<%= @app %>_android@127.0.0.1")
   end
 end

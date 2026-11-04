@@ -2,7 +2,7 @@
 # Anchor counts are checked: an upstream layout change must be reviewed, never silently skipped.
 script = File.read!("priv/fog_of_war_seed.js")
 encoded = Base.encode64(script)
-kotlin_chunks = Regex.scan(~r/.{1,16000}/, encoded) |> List.flatten() |> Enum.map_join(", ", &inspect/1)
+kotlin_chunks = Regex.scan(~r/.{1,16000}/, encoded) |> List.flatten() |> Enum.map_join(", ", &inspect(&1, limit: :infinity, printable_limit: :infinity))
 origin = "http://127.0.0.1:47180"
 patch = fn file, anchor, insertion ->
   source = File.read!(file)

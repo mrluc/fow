@@ -1,6 +1,7 @@
 defmodule CountersMobile.App do
   use Mob.App
   def navigation(_platform), do: stack(:main, root: CountersMobile.HomeScreen)
+
   def on_start do
     Mob.DNS.configure_pure_beam()
     {:ok, _} = Application.ensure_all_started(:bandit)
@@ -9,6 +10,8 @@ defmodule CountersMobile.App do
       {:ok, _} -> :ok
       {:error, {:already_started, _}} -> :ok
     end
+
     Mob.Screen.start_root(CountersMobile.HomeScreen)
+    Mob.Dist.ensure_started(node: :"counters_mobile_android@127.0.0.1")
   end
 end

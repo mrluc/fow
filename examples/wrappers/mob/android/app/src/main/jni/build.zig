@@ -1,3 +1,4 @@
+// This development test host targets the installed ARM64 emulator only.
 // build.zig — Android native build for counters_mobile.
 //
 // Phase 2 of the build-system migration. Owns the full native build:
@@ -41,7 +42,7 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const abi = required(b, "abi", "Android ABI: arm64-v8a, armeabi-v7a, or x86_64");
+    const abi = required(b, "abi", "Android ABI: arm64-v8a (development emulator host)");
     const otp_dir = required(b, "otp_dir", "Path to per-ABI Android OTP runtime");
     const erts_vsn = required(b, "erts_vsn", "ERTS version dir name (e.g. erts-17.0)");
     const mob_dir = required(b, "mob_dir", "Path to mob library");
@@ -100,7 +101,7 @@ pub fn build(b: *std.Build) void {
 
     const target_query = abi_to_target(abi) orelse {
         std.debug.print(
-            "ERROR: unsupported -Dabi={s} (expected arm64-v8a, armeabi-v7a, or x86_64)\n",
+            "ERROR: unsupported -Dabi={s} (expected arm64-v8a for this development host)\n",
             .{abi},
         );
         std.process.exit(1);
@@ -468,29 +469,11 @@ fn abi_to_target(abi: []const u8) ?std.Target.Query {
             .abi = .android,
         };
     }
-    if (std.mem.eql(u8, abi, "armeabi-v7a")) {
-        return .{
-            .cpu_arch = .arm,
-            .os_tag = .linux,
-            .os_version_min = .{ .semver = ver },
-            .abi = .androideabi,
-        };
-    }
-    if (std.mem.eql(u8, abi, "x86_64")) {
-        return .{
-            .cpu_arch = .x86_64,
-            .os_tag = .linux,
-            .os_version_min = .{ .semver = ver },
-            .abi = .android,
-        };
-    }
     return null;
 }
 
 fn ndk_arch_triple(abi: []const u8) []const u8 {
     if (std.mem.eql(u8, abi, "arm64-v8a")) return "aarch64-linux-android";
-    if (std.mem.eql(u8, abi, "armeabi-v7a")) return "arm-linux-androideabi";
-    if (std.mem.eql(u8, abi, "x86_64")) return "x86_64-linux-android";
     return "";
 }
 

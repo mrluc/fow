@@ -13,6 +13,7 @@ defmodule CountersMobile.MixProject do
         {:plug, "~> 1.18"},
         {:jason, "~> 1.4"},
         {:mob, "== 0.9.27"},
+        {:ecto_sqlite3, "~> 0.18"},
         {:mob_dev, "~> 0.7.31", only: :dev, runtime: false}
       ],
       erlc_paths: ["src"],

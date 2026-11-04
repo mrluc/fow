@@ -111,9 +111,10 @@ defmodule FogOfWar.Wrapper.Generator do
   end
 
   defp mixfile(target, a) do
+    # Mob's blank native scaffold links SQLite, so retain its source dependency.
     platform =
       if target == :mob do
-        "{:mob, \"== 0.9.27\"}, {:mob_dev, \"~> 0.7.31\", only: :dev, runtime: false}"
+        "{:mob, \"== 0.9.27\"}, {:ecto_sqlite3, \"~> 0.18\"}, {:mob_dev, \"~> 0.7.31\", only: :dev, runtime: false}"
       else
         "{:elixirkit, github: \"livebook-dev/elixirkit\", ref: \"#{@elixirkit_ref}\"}"
       end
