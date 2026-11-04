@@ -1,6 +1,6 @@
 defmodule FogOfWar.Wrapper.Generator do
   @moduledoc "Generates small, independent native hosts from the same reviewed public bundle."
-  alias FogOfWar.Wrapper.{Export, Manifest}
+  alias FogOfWar.Wrapper.{Export, Manifest, Output}
   @elixirkit_ref "16d19dd3fe7ad0c0e38a1667a90ed7962ed477c7"
 
   def run!(target, manifest_path, output, opts \\ []) when target in [:mob, :elixirkit] do
@@ -16,11 +16,6 @@ defmodule FogOfWar.Wrapper.Generator do
                "Export a public bundle matching the selected environment and web.origin first"
              )
 
-    if File.exists?(output),
-      do: Mix.raise("Destination exists: #{output}; generated projects are never overwritten")
-
-    stage = Path.expand(output) <> ".tmp-#{System.unique_integer([:positive])}"
-    File.mkdir_p!(stage)
     app = manifest["app"]["slug"] <> if(target == :mob, do: "_mobile", else: "_desktop")
 
     assigns = [
@@ -37,7 +32,7 @@ defmodule FogOfWar.Wrapper.Generator do
       desktop_startup: get_in(manifest, ["elixirkit", "startup"]) || "bundled"
     ]
 
-    try do
+    Output.replace!(output, [force: opts[:force], protected: [root, bundle_path]], fn stage ->
       if target == :mob, do: scaffold_mob!(stage, app, manifest)
       copy_bundle!(bundle_path, Path.join(stage, "priv/fog_of_war"))
       put!(stage, "priv/fog_of_war_seed.js", Export.seed_script(bundle))
@@ -64,12 +59,7 @@ defmodule FogOfWar.Wrapper.Generator do
       )
 
       put!(stage, "README.md", readme(target, assigns))
-      File.mkdir_p!(Path.dirname(Path.expand(output)))
-      File.rename!(stage, output)
-      output
-    after
-      File.rm_rf(stage)
-    end
+    end)
   end
 
   # No recursive copy of the source project or arbitrary bundle neighbours.

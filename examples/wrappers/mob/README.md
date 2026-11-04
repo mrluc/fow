@@ -11,3 +11,9 @@ Commit Mix/Cargo/Gradle lockfiles after the first successful build. To preview j
 The inferred icon is copied to `branding/source.*`. Mobile launchers still use scaffold artwork until applying Mob's documented `mix mob.icon --source` workflow (requires Image).
 
 `prepare-native.exs` patches the pinned Mob WebViews before native build. Reapply after deps.get or seed changes. It replaces marked blocks, checks anchors and refuses unexpected layouts. Android without document-start support retains the offline shell but cannot seed the remote cache before page scripts. Native execution on each device target still needs verification.
+
+## Independent WebView prototype
+
+This development consumer now references the sibling `elixir-client/mob_webview` project through a path dependency and activates its native plugin in `mob.exs`. Its screen uses `MobWebView.view/1`, not the built-in `<WebView>`. Keep the sibling checkout beside `fow`; this prototype is not a published Hex dependency. The server-side FoW package has no dependency on Mob or this component.
+
+The plugin's Swift/Kotlin source and Elixir integration compile, but a mobile native rebuild and device/simulator smoke test are still required. The previously installed native app will not acquire the component through an Elixir-only push. This prototype does not yet add asset serving, document-start FoW snapshot seeding, or cold-offline startup. Its unsigned-plugin acknowledgment is confined to this local example; distributed builds should sign and trust the plugin.

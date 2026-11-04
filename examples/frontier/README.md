@@ -44,7 +44,7 @@ cd .fow/apps/elixirkit/dev
 ./build.sh
 ```
 
-Export and generation refuse to overwrite their existing output folders. Rename or remove only those generated folders when regenerating. Build uses the normal desktop toolchain; the repository's `elixir-client/env.sh` selects the shared native compilation cache on this development machine.
+For a single-command rebuild and local installation, run `mix fow.desktop --force` from this example directory. It refreshes the public export, replaces the generated project, builds and installs `Frontier.app` into `~/Applications`, then registers it for Spotlight. This discards changes inside the generated project; the example source and artwork remain untouched. Separate generation supports `--force`; standalone `mix fow.export` still requires a fresh export directory. Build uses the normal desktop toolchain; the repository's `elixir-client/env.sh` selects the shared native compilation cache on this development machine.
 
 The resulting `Frontier.app` is under `$CARGO_TARGET_DIR/release/bundle/macos/` (or the generated project's `src-tauri/target/release/bundle/macos/` without that environment variable). Copy it into `~/Applications` to launch it from Spotlight. It is locally signed for development, not notarized for distribution.
 

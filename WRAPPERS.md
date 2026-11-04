@@ -143,7 +143,7 @@ mix fow.gen.elixirkit --output ../counter-desktop
 mix fow.gen.mob --output ../counter-mobile
 ```
 
-Both tasks accept `--manifest path/to/.fow.json`. They refuse existing output folders. The manifest's bundle path is resolved relative to its own directory; output paths are relative to the command's working directory. Generated applications are independent projects and do not depend on `:fow` or the source Phoenix app. Commit the new hosts and their lockfiles after resolving/building them.
+Both tasks accept `--manifest path/to/.fow.json`. They refuse existing output folders unless `--force` is passed. With `--force`, the entire old output is replaced only after generation succeeds in a temporary sibling directory; custom changes and downloaded/build dependencies in that output are discarded. Source-project, home/root/ancestor and symlink destinations are rejected. The manifest's bundle path is resolved relative to its own directory; output paths are relative to the command's working directory. Generated applications are independent projects and do not depend on `:fow` or the source Phoenix app. Commit the new hosts and their lockfiles after resolving/building them.
 
 The Mob generator requires the upstream `mob_new` archive once (`mix archive.install hex mob_new`). It invokes `mix mob.new --blank --no-install` internally and writes the small wrapper screen, startup, public server, native patch script and build script. Users do not run the scaffold generator or write WebView bridge code for each site. ElixirKit generation writes its small Tauri host directly; no Tauri scaffold generator is needed.
 
@@ -164,6 +164,30 @@ cd ../counter-mobile
 The mobile script fetches dependencies, runs Mob's installation step, applies the native document-start integration and invokes Mob's native deployment. It needs Android SDK/NDK/JDK or Xcode and a compatible simulator/device. Installation can download large OTP runtimes. The icon source is copied to `branding/source.*`; mobile launchers retain Mob's default artwork until applying it with Mob's documented `mix mob.icon` workflow (requires its Image dependency). Desktop artwork is applied by the generated build script.
 
 For this workspace's running Counter demo, the manifest uses `http://127.0.0.1:47180`. Android needs `adb reverse tcp:47180 tcp:47180` to reach the developer machine at that address. Distribution should use a reachable HTTPS origin. The bundled shell works independently of that connection.
+
+## Build, install, or run the whole desktop workflow
+
+From the Phoenix app containing `.fow.json`:
+
+```sh
+# Source generation only. --output always names the generated source project.
+mix fow.gen.elixirkit --env dev --output native/desktop --force
+
+# Build that project; uses its build.sh and your configured native toolchain.
+mix fow.build.elixirkit --env dev --output native/desktop
+
+# Install an already-built app, without rebuilding or launching it.
+mix fow.install.osx-local --app /path/to/Counter.app --force
+
+# Refresh public export, generate sources, build, and install in one command.
+mix fow.desktop --env dev --force
+```
+
+`fow.desktop` is macOS-only. Its `--force` replaces the selected public export, generated source project and installed app. Each replacement is staged before swapping; a failed generation or app copy leaves the previous destination intact. It does not roll back a successful export/generation if a later native build fails. Run without `--force` to preserve existing outputs. `--manifest`, `--env`, `--output` and `--base-url` select the manifest/environment, generated source destination and optional capture server. The normal manifest `web.origin` remains the website identity.
+
+`fow.install.osx-local` copies into `~/Applications` by default; `--applications /other/directory` changes that directory. It registers the installed bundle with LaunchServices and asks Spotlight to import it. It does not open the app, publish it, or add distribution signing/notarization. The conventional underscore spelling `fow.install.osx_local` works too.
+
+For an ejected project, generate into a permanent directory, commit it and customize it. Continue using its `build.sh` or point `fow.build.elixirkit --output` at it. Do not use `--force` on that project unless you intend to discard all of its modifications. Mobile generation supports the same atomic `--force`; mobile build/deploy still uses the generated `build.sh --android` / `--ios` until separate strategies are added.
 
 ## Native integration boundaries
 
