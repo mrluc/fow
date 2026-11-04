@@ -46,7 +46,12 @@ defmodule FogOfWar.WrapperTest do
   test "export strips executable and session state, keeps navigation and copies only public assets",
        context do
     %{root: root, manifest: manifest, html: html} = context
-    bundle = Export.run!(manifest, root, Path.join(root, "public"), fetch: fn _ -> html end)
+
+    bundle =
+      Export.run!(manifest, root, Path.join(root, "public"),
+        fetch: fn url -> for_path(html, url) end
+      )
+
     assert map_size(bundle["pages"]) == 2
     assert bundle["assets"] == %{"/css/site.css" => "assets/css/site.css"}
     page = File.read!(Path.join([root, "public", bundle["pages"]["/"]["file"]]))
@@ -67,7 +72,10 @@ defmodule FogOfWar.WrapperTest do
 
   test "a generated desktop contains public artifacts and standalone code, never source Phoenix app",
        %{root: root, manifest: manifest, html: html} do
-    Export.run!(manifest, root, Path.join(root, "public"), fetch: fn _ -> html end)
+    Export.run!(manifest, root, Path.join(root, "public"),
+      fetch: fn url -> for_path(html, url) end
+    )
+
     Manifest.write!(Path.join(root, ".fow.json"), manifest)
     output = Path.join(root, "desktop")
     Generator.run!(:elixirkit, Path.join(root, ".fow.json"), output)
@@ -97,7 +105,9 @@ defmodule FogOfWar.WrapperTest do
     File.ln_s!(Path.join(root, "secret.css"), Path.join(root, "priv/static/css/site.css"))
 
     assert_raise Mix.Error, ~r/symlinked/, fn ->
-      Export.run!(manifest, root, Path.join(root, "public"), fetch: fn _ -> html end)
+      Export.run!(manifest, root, Path.join(root, "public"),
+        fetch: fn url -> for_path(html, url) end
+      )
     end
 
     refute File.exists?(Path.join(root, "public"))
@@ -161,5 +171,13 @@ defmodule FogOfWar.WrapperTest do
     assert {log, status} = run.()
     assert status != 0
     assert log =~ "anchor changed"
+  end
+
+  defp for_path(html, url) do
+    String.replace(
+      html,
+      ~s(data-fog-of-war-path="/"),
+      ~s(data-fog-of-war-path="#{URI.parse(url).path}")
+    )
   end
 end

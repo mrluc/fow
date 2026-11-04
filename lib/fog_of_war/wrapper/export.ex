@@ -1,6 +1,6 @@
 defmodule FogOfWar.Wrapper.Export do
   @moduledoc "Exports explicitly public, unauthenticated HTML and reachable static assets."
-  alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.{Manifest, CacheExport}
   @build "fog-of-war-2"
   @removed ~w(script iframe object embed base)
   @unsafe_attrs ~w(action formaction nonce integrity)
@@ -20,7 +20,7 @@ defmodule FogOfWar.Wrapper.Export do
           "Export destination exists: #{output}; use a fresh path and review it before replacing a bundle"
         )
 
-    origin = opts[:base_url] || manifest["web"]["origin"]
+    origin = CacheExport.capture_origin!(manifest, opts)
     stage = output <> ".tmp-#{System.unique_integer([:positive])}"
     File.mkdir_p!(stage)
     Application.ensure_all_started(:inets)
@@ -29,8 +29,12 @@ defmodule FogOfWar.Wrapper.Export do
     try do
       pages =
         Map.new(paths, fn path ->
-          fetch = opts[:fetch] || (&fetch!/1)
+          fetch = opts[:fetch] || (&fetch_html!/1)
           body = fetch.(origin <> path)
+
+          cache_record =
+            CacheExport.capture!(manifest, path, body, Path.join(stage, "cache"), opts)
+
           document = Floki.parse_document!(body)
           title = document |> Floki.find("title") |> Floki.text()
           region = Floki.find(document, "[phx-hook=FogOfWar]")
@@ -81,8 +85,15 @@ defmodule FogOfWar.Wrapper.Export do
             "html" => snapshot_html
           }
 
-          {path, %{"file" => name, "snapshot" => snapshot}}
+          {path, %{"file" => name, "snapshot" => snapshot, "cache" => cache_record}}
         end)
+
+      cache_pages = Map.new(pages, fn {path, page} -> {path, page["cache"]} end)
+      CacheExport.finish!(manifest, cache_pages, Path.join(stage, "cache"), opts)
+
+      cache_files =
+        ["cache/index.json", "cache/startup.html"] ++
+          Enum.map(cache_pages, fn {_, record} -> "cache/" <> record["file"] end)
 
       references =
         Enum.flat_map(pages, fn {_, page} ->
@@ -100,6 +111,8 @@ defmodule FogOfWar.Wrapper.Export do
 
       bundle = %{
         "schema" => 1,
+        "environment" => manifest["environment"],
+        "cache" => %{"index" => "cache/index.json", "files" => cache_files},
         "scope" => "public",
         "origin" => manifest["web"]["origin"],
         "start_path" => manifest["web"]["start_path"],
@@ -140,7 +153,11 @@ defmodule FogOfWar.Wrapper.Export do
     """
   end
 
-  defp fetch!(url) do
+  @doc false
+  def fetch_html!(url) do
+    Application.ensure_all_started(:inets)
+    Application.ensure_all_started(:ssl)
+
     ssl = [
       verify: :verify_peer,
       cacerts: :public_key.cacerts_get(),
@@ -174,6 +191,9 @@ defmodule FogOfWar.Wrapper.Export do
           do: Mix.raise("Expected public HTML from #{url}, got #{type}")
 
         body
+
+      {:ok, {{_, 200, _}, _, body}} when byte_size(body) > 2_000_000 ->
+        Mix.raise("Public HTML exceeds the 2,000,000-byte per-page limit: #{url}")
 
       {:ok, {{_, status, _}, _, _}} ->
         Mix.raise("Public export requires HTTP 200 without redirects: #{url} returned #{status}")

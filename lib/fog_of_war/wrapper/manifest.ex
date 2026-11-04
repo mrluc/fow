@@ -1,6 +1,6 @@
 defmodule FogOfWar.Wrapper.Manifest do
   @moduledoc "A reviewable, JSON-only contract between a Phoenix app and its native wrappers."
-  @schema 1
+  @schema 2
 
   def discover(opts) do
     config = Mix.Project.config()
@@ -55,6 +55,8 @@ defmodule FogOfWar.Wrapper.Manifest do
 
     %{
       "schema" => @schema,
+      "default_env" => "dev",
+      "envs" => %{"dev" => %{}},
       "app" => %{
         "name" => opts[:name] || Macro.camelize(slug),
         "slug" => slug,
@@ -80,12 +82,70 @@ defmodule FogOfWar.Wrapper.Manifest do
       "mob" => %{"platforms" => ["android", "ios"]},
       "elixirkit" => %{"width" => 1060, "height" => 760}
     }
-    |> validate!()
+    |> tap(&resolve!/1)
   end
 
-  def read!(path), do: path |> File.read!() |> Jason.decode!() |> validate!()
+  def read!(path, env \\ nil), do: path |> File.read!() |> Jason.decode!() |> resolve!(env)
 
-  def validate!(%{"schema" => @schema, "app" => app, "web" => web, "public" => public} = manifest) do
+  @doc "Merge a named environment over top-level defaults, then validate the result."
+  def resolve!(document, env \\ nil) when is_map(document) do
+    unless document["schema"] in [1, 2],
+      do: Mix.raise("Unsupported .fow.json schema; expected 1 or 2")
+
+    case Map.fetch(document, "envs") do
+      :error ->
+        if env && env != document["environment"],
+          do: Mix.raise("Manifest has no environment #{inspect(env)}")
+
+        validate!(document)
+
+      {:ok, profiles} when is_map(profiles) ->
+        name = env || document["default_env"] || "dev"
+
+        unless is_binary(name) && Regex.match?(~r/^[A-Za-z0-9][A-Za-z0-9_-]*$/, name),
+          do:
+            Mix.raise(
+              "Environment names must be nonempty letters, digits, underscores or hyphens"
+            )
+
+        overrides = Map.get(profiles, name)
+
+        unless is_map(overrides),
+          do:
+            Mix.raise(
+              "Unknown or invalid environment #{inspect(name)}; available: #{Enum.join(Map.keys(profiles), ", ")}"
+            )
+
+        if Enum.any?(
+             ["schema", "envs", "default_env", "environment"],
+             &Map.has_key?(overrides, &1)
+           ),
+           do: Mix.raise("Environment overrides cannot replace manifest control fields")
+
+        resolved =
+          document
+          |> Map.drop(["envs", "default_env"])
+          |> deep_merge(overrides)
+          |> Map.put("environment", name)
+          |> validate!()
+
+        # Isolate generated artifacts even when profiles inherit the same output defaults.
+        update_in(resolved, ["public", "bundle"], &Path.join(&1, name))
+
+      _ ->
+        Mix.raise("envs must be a map of environment names to override maps")
+    end
+  end
+
+  defp deep_merge(left, right) do
+    Map.merge(left, right, fn
+      _key, a, b when is_map(a) and is_map(b) -> deep_merge(a, b)
+      _key, _a, b -> b
+    end)
+  end
+
+  def validate!(%{"schema" => schema, "app" => app, "web" => web, "public" => public} = manifest)
+      when schema in [1, 2] and is_map(app) and is_map(web) and is_map(public) do
     require_match!(
       app["slug"],
       ~r/^[a-z][a-z0-9_]*$/,
@@ -109,14 +169,12 @@ defmodule FogOfWar.Wrapper.Manifest do
           "app.name must be a display name, without path separators or control characters"
         )
 
-    uri = URI.parse(web["origin"] || "")
+    origin = validate_origin!(web["origin"], "web.origin")
 
-    unless uri.scheme in ["http", "https"] && is_binary(uri.host) && uri.userinfo == nil &&
-             uri.query == nil && uri.fragment == nil && uri.path in [nil, "", "/"],
-           do: Mix.raise("web.origin must be an HTTP(S) origin, without credentials or a path")
-
-    if uri.scheme == "http" && uri.host not in ["localhost", "127.0.0.1", "[::1]", "::1"],
-      do: Mix.raise("Use HTTPS for non-loopback origins")
+    if capture = manifest["capture"] do
+      unless is_map(capture), do: Mix.raise("capture must be a map")
+      if capture["origin"], do: validate_origin!(capture["origin"], "capture.origin")
+    end
 
     validate_path!(web["start_path"])
 
@@ -143,11 +201,25 @@ defmodule FogOfWar.Wrapper.Manifest do
     end
 
     if app["icon"], do: relative_path!(app["icon"])
-    origin = URI.to_string(%{uri | path: nil, host: String.downcase(uri.host)})
     %{manifest | "web" => Map.put(web, "origin", origin)}
   end
 
-  def validate!(_), do: Mix.raise("Unsupported .fow.json schema; expected schema 1")
+  def validate!(_),
+    do: Mix.raise("Resolved manifest requires schema 1 or 2 and app, web, public maps")
+
+  def validate_origin!(value, label \\ "origin") do
+    unless is_binary(value), do: Mix.raise("#{label} must be an HTTP(S) origin")
+    uri = URI.parse(value)
+
+    unless uri.scheme in ["http", "https"] && is_binary(uri.host) && uri.userinfo == nil &&
+             uri.query == nil && uri.fragment == nil && uri.path in [nil, "", "/"],
+           do: Mix.raise("#{label} must be an HTTP(S) origin, without credentials or a path")
+
+    if uri.scheme == "http" && uri.host not in ["localhost", "127.0.0.1", "[::1]", "::1"],
+      do: Mix.raise("Use HTTPS for non-loopback origins")
+
+    URI.to_string(%{uri | path: nil, host: String.downcase(uri.host)})
+  end
 
   def validate_path!(path) do
     unless is_binary(path) && String.starts_with?(path, "/") && !String.starts_with?(path, "//") &&

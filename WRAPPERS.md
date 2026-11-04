@@ -1,5 +1,69 @@
 # Generate a WebView app from a LiveView site
 
+## Environment overrides and browser-free cache export
+
+The manifest supports arbitrary named environments under `envs`. All other configuration at the top level supplies defaults. Nested maps merge recursively; arrays and scalar values replace the default value. Required values are validated **after** resolving the selected environment, so a required setting may exist only in an environment. Control fields (`schema`, `envs`, `default_env`, `environment`) cannot be overridden inside an environment. Environment names use letters, digits, underscores, and hyphens; they remain strings, not dynamically created Elixir atoms.
+
+```json
+{
+  "schema": 2,
+  "default_env": "dev",
+  "app": {
+    "name": "Counters",
+    "slug": "counters",
+    "identifier": "dev.example.counters",
+    "version": "0.1.0"
+  },
+  "web": {"origin": "http://127.0.0.1:47180", "start_path": "/"},
+  "public": {
+    "paths": ["/", "/counters/one"],
+    "static_root": "priv/static",
+    "asset_directories": ["assets", "css", "fonts", "images"],
+    "bundle": ".fow/public"
+  },
+  "envs": {
+    "dev": {},
+    "testflight": {
+      "app": {"name": "Counters Preview", "identifier": "dev.example.counters.preview"},
+      "web": {"origin": "https://preview.example.com"},
+      "public": {"paths": ["/"]}
+    }
+  }
+}
+```
+
+`mix fow.export --env testflight` selects that environment. Omitting `--env` selects `default_env`, or `dev` if no default is declared. This is independent of `MIX_ENV`: it chooses the website to capture and the wrapper identity, not the local application's development/test/production configuration. Replace placeholder production/preview domains with a real public deployment before exporting. A missing or invalid environment fails rather than falling back to development.
+
+Resolved public bundle directories automatically gain the environment name: the example above exports to `.fow/public/dev` or `.fow/public/testflight`. Generator defaults similarly use `.fow/apps/mob/<env>` and `.fow/apps/elixirkit/<env>`. Explicit `--output` paths are used as supplied. Existing flat schema-1 manifests retain their original paths and require no migration. Generated wrappers store the resolved manifest, including its environment, rather than carrying unresolved profiles. Generators reject exports whose website origin or environment does not match.
+
+For a build-machine capture address different from the device's website address, set `capture.origin` in defaults or an environment. It defaults to `web.origin`; `--base-url` overrides only the capture address. For example, a build machine can download from loopback while the native app is configured for a device-reachable website. These addresses must be HTTP(S) origins, with HTTPS required outside loopback.
+
+### Export just the compressed public records
+
+```sh
+mix fow.export.cache --env dev --output .fow/cache/dev --debug
+```
+
+This task runs entirely in Elixir. It downloads each explicitly listed public route's initial HTML response without cookies, JavaScript execution, Playwright, or browser-profile access. It requires exactly one `phx-hook="FogOfWar"` region whose `data-fog-of-war-path` matches the requested route. It parses that element and its descendants, gzips the UTF-8 markup using Erlang's built-in `:zlib`, and writes a binary `.html.gz` file. Each HTML response is limited to 2,000,000 bytes and is processed before moving to the next route; the accumulated index contains metadata, not the HTML collection. No base64 representation is included in these binary files.
+
+The output is `index.json`, `startup.html` (the selected start path's complete, unmodified HTTP response), and `pages/<route-sha256>.html.gz`. Index records contain path, title, region ID, snapshot schema/build, capture time, byte counts, and a payload checksum. The index also records the selected environment, intended app origin, and capture origin. New exports refuse an existing destination and publish the output directory only after all pages succeed.
+
+`--debug` additionally retains per-route request method/URL, complete response HTML, and extracted region HTML under `debug/<route-sha256>/`. Debug HTML and `startup.html` can contain anonymous LiveView bootstrap values from the public response; no response cookies or browser state are exported. The standalone cache task does **not** collect assets: it produces records and the initial document for the next loader/import stage. The full public exporter retains its existing allowlisted asset-copy behavior, which uses the local project's static files; matching deployment assets are required when exporting a deployed site.
+
+### Keep existing source generation working
+
+```sh
+mix fow.export --env dev
+mix fow.gen.elixirkit --env dev
+mix fow.gen.mob --env dev
+```
+
+The full exporter still produces the legacy public shell and now also places the binary record export under `cache/`. Both native generators copy that cache index, startup document, and listed payloads into their app resources using an explicit file allowlist. This preserves existing shell behavior while providing the new artifacts for the future IndexedDB importer. **Neither IndexedDB import nor seamless native cold-start handoff is implemented by these tasks yet.** The legacy sanitized shell remains separate from the complete startup response stored under `cache/startup.html`.
+
+Generating a source wrapper does not compile Rust, install mobile SDKs, download simulator images, or build native dependencies. The Mob generator invokes `mob.new --no-install` and requires the existing `mob_new` archive. The later `build.sh` step is the expensive native build. Do not use generation success as evidence that an iOS/Android/desktop binary was built or tested.
+
+
+
 **Startup design under revision:** the manual “Open live site” flow below is a prototype and does not meet the seamless-startup requirement. [ADR 0001](docs/adr/0001-seamless-public-startup-recovery.md) defines the proposed automatic recovery contract and the platform tests required before rollout. Its configuration is proposed, not implemented.
 
 The generators make small native hosts for an existing website. They do not package its Phoenix server. Both targets consume the same reviewable `.fow.json` and explicitly public HTML export. The desktop target uses ElixirKit with a Tauri WebView. The mobile target uses Mob's existing native WebView component.
@@ -120,3 +184,7 @@ The source example is `examples/basic`, its manifest is `examples/basic/.fow.jso
 Validation: seven package tests, five Counter LiveView tests, four dev-tools browser tests and one Mob screen test pass. `test/browser/wrapper-smoke.cjs` verifies actual generated public-shell navigation/back, disabled actions, absence of signed session data, no external requests, document-start seeding, origin restriction and no overwrite of existing state. It runs with `PUBLIC_SHELL_URL` set to the generated host's printed readiness URL and the workspace Playwright installation in `NODE_PATH`. The screenshot is `results/wrapper-public-shell.png`.
 
 The generated macOS app is at `elixir-client/.cache/tauri-target/release/bundle/macos/Counters.app` when built using the shared workspace cache. Its window was inspected showing the bundled public Counter site. Android/iOS native execution of this new wrapper remains unverified; compilation and patch checks alone do not prove device behavior.
+
+### Source-generation cost measured in this workspace
+
+With four Counter routes, the cache export held 2,385 gzip payload bytes. Desktop source generation took 0.78 seconds with about 97 MiB maximum resident memory and produced 152 KiB on disk; Mob source generation took 2.22 seconds with about 95 MiB maximum resident memory and produced 1.3 MiB. These are local measurements, not performance guarantees. The existing Mob archive was reused via `MIX_ARCHIVES`; neither run installed dependencies or compiled a native binary. Both generated projects' Elixir sources parsed, and all copied compressed records decoded and matched their routes.

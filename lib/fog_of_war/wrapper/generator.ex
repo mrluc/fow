@@ -3,14 +3,18 @@ defmodule FogOfWar.Wrapper.Generator do
   alias FogOfWar.Wrapper.{Export, Manifest}
   @elixirkit_ref "16d19dd3fe7ad0c0e38a1667a90ed7962ed477c7"
 
-  def run!(target, manifest_path, output) when target in [:mob, :elixirkit] do
-    manifest = Manifest.read!(manifest_path)
+  def run!(target, manifest_path, output, opts \\ []) when target in [:mob, :elixirkit] do
+    manifest = Manifest.read!(manifest_path, opts[:env])
     root = Path.dirname(Path.expand(manifest_path))
     bundle_path = Path.expand(manifest["public"]["bundle"], root)
     bundle = Path.join(bundle_path, "bundle.json") |> File.read!() |> Jason.decode!()
 
-    unless bundle["scope"] == "public" && bundle["origin"] == manifest["web"]["origin"],
-      do: Mix.raise("Export a public bundle matching web.origin first")
+    unless bundle["scope"] == "public" && bundle["origin"] == manifest["web"]["origin"] &&
+             bundle["environment"] == manifest["environment"],
+           do:
+             Mix.raise(
+               "Export a public bundle matching the selected environment and web.origin first"
+             )
 
     if File.exists?(output),
       do: Mix.raise("Destination exists: #{output}; generated projects are never overwritten")
@@ -73,6 +77,7 @@ defmodule FogOfWar.Wrapper.Generator do
 
     files =
       ["bundle.json", "_fog/bootstrap.js"] ++
+        (get_in(bundle, ["cache", "files"]) || []) ++
         Map.values(bundle["assets"]) ++
         Enum.map(bundle["pages"], fn {_, page} -> page["file"] end)
 

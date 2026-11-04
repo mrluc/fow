@@ -33,7 +33,7 @@
     ],
     "static_root": "priv/static"
   },
-  "schema": 1,
+  "schema": 2,
   "web": {
     "discovered_routes": [
       "/",
@@ -43,5 +43,17 @@
     "origin": "http://127.0.0.1:47180",
     "router": "FogOfWarBasicWeb.Router",
     "start_path": "/"
+  },
+  "default_env": "dev",
+  "envs": {
+    "dev": {},
+    "prod": {
+      "web": {
+        "origin": "https://counters.example"
+      },
+      "app": {
+        "identifier": "dev.fogofwar.counters.production"
+      }
+    }
   }
 }
