@@ -219,3 +219,23 @@ The client now exposes `coordinator.cache.importBundle(indexURL, options)` for t
 ### Direct desktop launch
 
 Set `elixirkit.startup` to `"live"` to open `web.origin + web.start_path` directly in the desktop window. The default `"bundled"` retains the earlier public-shell prototype. Direct launch needs the configured server to be reachable at startup; it does not implement the bundled-first automatic recovery described in the ADR. Frontier's `.fow.json` demonstrates this development configuration. Desktop builds now explicitly include the generated `.icns` and PNG files in their bundle icon configuration.
+
+## Native asset startup prototype
+
+`mix fow.bundle.prepare --platform android` reads the selected manifest environment, fetches each explicit public path and prepares `.fow/native/<environment>/android/`. Use `--platform ios` for the Apple variant. `--output` selects a fresh destination; existing destinations are refused. `--debug` retains the capture HTML. This task requires Elixir, the selected website and its matching local static directory; it does not require Playwright or a running production configuration on the build machine.
+
+The output contains executable `startup.html`, metadata-only `index.json`, separate gzip region files, copied assets, a small startup configuration script and `native.json`, the native resource allowlist. Application scripts are included. HTML URL attributes and CSS asset references are rewritten for Apple's custom asset scheme; navigation URLs, the cache origin and LiveView tokens retain their real website values. Each region is processed separately. This prototype supports local allowlisted static files, including CSS imports; it does not discover arbitrary dynamic imports or arbitrary URLs constructed inside JavaScript. Frontier explicitly resolves its canvas sprite URLs through the startup asset map. Remote CDN assets and additional HTML asset forms need their own coverage before using this as a general exporter.
+
+The separate `mob_webview` package accepts `bundle: MobWebView.Bundle.load!(root)` alongside `url: bundle["url"]`. Copy the prepared directory to the generated host's `priv` directory and resolve its on-device application path. Native code reads only declared files. The initial document is supplied once; later document navigations reach the website, allowing LiveView to renew stale bootstrap state. The existing gzip importer seeds IndexedDB in batches and preserves newer device captures. A small startup configuration is present in the HTML, not the region payloads.
+
+The existing ejected Android test host in `examples/wrappers/mob` now opens `CountersMobile.FrontierScreen` without native Live/Offline buttons or the legacy shell. Its historical application identifier stays unchanged so the installed ARM64 build can be reused. The Counter Phoenix example is unchanged. The general mobile generator still emits the older shell; switching its template to this tested path is a separate follow-up.
+
+After preparing an Android bundle and copying it to that host's `priv/frontier`, deploy with Mob's existing native deployment command. Run the repeatable device test from the host:
+
+```sh
+MOB_WEBVIEW_ANDROID_DEVICE=emulator-5554 mix run --no-start ../../../test/native/mob-frontier.exs
+```
+
+The test clears only the development host's WebView data, starts without website port forwarding, checks four imported routes, decodes all five artwork files, reads their pixels through canvas, verifies the pixel fog paints, and navigates offline. It then restores forwarding and requires automatic recovery on the selected route followed by another live navigation. Remove any existing website forwarding before running it. `test/browser/native-bundle.spec.cjs` repeats this flow in a clean browser context using the real bundle exporter.
+
+Android ARM64 emulator execution passed. Apple source passes the installed iOS SDK typecheck only: `WKURLSchemeHandler` serves assets and `loadSimulatedRequest` supplies the initial document at its real URL, requiring iOS 15 or newer. Custom-scheme fetch, storage, canvas and connection behavior remain unverified on an iOS runtime. No Apple simulator was downloaded. Neither platform currently guarantees content preservation if a recovery HTTP navigation fails after the socket reconnects, and this prototype does not cache assets first discovered during later online browsing.

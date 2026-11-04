@@ -13,3 +13,5 @@
 /android/app/.cxx/
 /android/app/src/main/java/dev/fogofwar/webview/
 /android/app/src/main/java/io/mob/plugin/
+
+/priv/frontier/

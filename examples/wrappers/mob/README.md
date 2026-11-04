@@ -1,4 +1,10 @@
-# Counters — mob wrapper
+# Frontier native test host
+
+This ejected development host now starts Frontier through the separate MobWebView bundle API, without wrapper controls. Its historical Counter application name and identifier remain so we can reuse the installed native host and ARM64 build caches. The Counter Phoenix example has not changed. See [native bundle preparation](../../../WRAPPERS.md#native-asset-startup-prototype) for the current output format and repeatable offline test. Prepare an Android Frontier bundle and copy it to `priv/frontier` before deployment; generated bundle files are ignored by Git.
+
+The notes below describe the older generated shell and the independent bridge test. They are retained as history; the current root screen does not use the shell's Live/Offline controls.
+
+## Legacy Counter shell
 
 Generated from `.fow.json` and an explicitly public HTML bundle. No source Phoenix application, database, credentials or signed LiveView session is embedded. The app serves its read-only public pages at a loopback origin; the real website stays at http://127.0.0.1:47180. Open live site loads that website. This is a starting point, not an authentication implementation.
 

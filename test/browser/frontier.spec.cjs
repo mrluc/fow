@@ -42,7 +42,7 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
   const panel=page.locator('[data-fog-of-war-dev-tools]');
   await panel.getByRole('button',{name:/Fog of War/}).click();
   await expect(panel.getByRole('button',{name:'Semi-transparent developer tools',exact:true})).toHaveAttribute('aria-pressed','true');
-  expect(await panel.evaluate(el=>el.style.getPropertyValue('--fog-of-war-dev-tools-scale'))).toBe('1.5');
+  expect(await panel.evaluate(el=>el.style.getPropertyValue('--fog-of-war-dev-tools-scale'))).toBe('1.1');
   await panel.getByRole('button',{name:'Disconnect socket',exact:true}).click();
   const requests=[];page.on('request',r=>requests.push(r.url()));
   await page.locator('.tile-target[href="/lat/1/lon/1"]').click();

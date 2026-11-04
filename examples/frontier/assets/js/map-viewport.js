@@ -15,9 +15,11 @@ export function installMapViewport() {
     requestAnimationFrame(() => { scheduled = false; draw() })
   }
   for (const image of [pine, idle, walking]) image.onload = schedule
-  pine.src = '/images/pine.png'
-  idle.src = '/images/scout-idle.png'
-  walking.src = '/images/scout-walk.png'
+  const asset = path => window.__fogOfWarNativeBundle?.assets?.[path] || path
+  for (const image of [pine, idle, walking]) image.crossOrigin = 'anonymous'
+  pine.src = asset('/images/pine.png')
+  idle.src = asset('/images/scout-idle.png')
+  walking.src = asset('/images/scout-walk.png')
 
   function draw() {
     const scene = document.getElementById('map-scene')

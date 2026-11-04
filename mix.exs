@@ -5,6 +5,7 @@ defmodule FogOfWar.MixProject do
     [
       app: :fow,
       version: "0.1.0",
+      test_ignore_filters: [~r{/native/}],
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: [{:phoenix_live_view, "~> 1.2.13"}, {:jason, "~> 1.4"}, {:floki, "~> 0.38.0"}],

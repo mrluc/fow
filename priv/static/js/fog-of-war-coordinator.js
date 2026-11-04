@@ -42,7 +42,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     }
   })
   let paused = false
-  let unavailable = false
+  let unavailable = Boolean(window.__fogOfWarNativeBundle)
   let everOpened = false
   const offline = () => paused || unavailable
   let snapshotMode = false

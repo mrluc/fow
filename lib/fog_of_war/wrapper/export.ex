@@ -155,6 +155,8 @@ defmodule FogOfWar.Wrapper.Export do
 
   @doc false
   def fetch_html!(url) do
+    Mix.ensure_application!(:inets)
+    Mix.ensure_application!(:ssl)
     Application.ensure_all_started(:inets)
     Application.ensure_all_started(:ssl)
 
@@ -254,16 +256,18 @@ defmodule FogOfWar.Wrapper.Export do
     end)
   end
 
-  defp copy_assets!([], _project, _manifest, _stage, found), do: found
+  @doc false
+  def copy_assets!([], _project, _manifest, _stage, found), do: found
 
-  defp copy_assets!([url | rest], project, manifest, stage, found) do
+  def copy_assets!([url | rest], project, manifest, stage, found) do
     uri = URI.parse(url)
     origin = manifest["web"]["origin"]
     local = is_nil(uri.host) || String.starts_with?(url, origin <> "/")
     path = uri.path || ""
 
     cond do
-      !local || path == "" || String.starts_with?(path, "/_fog/") || Map.has_key?(found, path) ->
+      uri.scheme not in [nil, "http", "https"] || !local || path == "" ||
+        String.starts_with?(path, "/_fog/") || Map.has_key?(found, path) ->
         copy_assets!(rest, project, manifest, stage, found)
 
       true ->
