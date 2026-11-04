@@ -25,6 +25,8 @@ PWDEBUG=1 bash test/browser/run.sh startup-model.spec.cjs
 
 | File | What it proves |
 |---|---|
+| `indexeddb.spec.cjs` | IndexedDB binary storage above localStorage capacity, legacy migration, failed writes, fallback, resumable bundle batches, checksum verification and device-copy preservation |
+| `compression.spec.cjs` | Real map region compression, Unicode, capture ordering and offline navigation |
 | `dev-tools.spec.cjs` | Persistent package-owned dev tools, offline navigation/Back, protected cache clearing across tabs, lockless fallback, and legacy cache-key replacement |
 | `cold-liveview.spec.cjs` | Complete baked LiveView HTML/client/assets, an empty browser data store, offline retries, normal stale-session recovery, and recovery at the final baked route after disconnected navigation |
 | `startup-session.spec.cjs` | Stock LiveView recovers from expired signed data, a missing cookie, or mismatched CSRF state; also characterizes the cached-content loss when its automatic page request fails |
@@ -57,3 +59,6 @@ The second test keeps the browser's local bundle supplier reachable while making
 Synthetic top-level HTML delivery initially triggered Chrome's local-network access checks on reconnection. The tests do not grant permissions or disable checks: they use real fixture HTTP delivery for the document. The actual browser context receives no build-time response cookies and never warms up against the live application. Results apply to the pinned client/server and this loading model; native origin/assets and cross-version compatibility remain rollout checks.
 
 The independent Frontier app is exercised by `frontier.spec.cjs`, on port 47192. Counter/fixture servers use 47182 and 47183. `transitions.spec.cjs` tests directional online/offline navigation and reduced motion. `FOG_OF_WAR_BROWSER_NODE_MODULES` can override the local browser dependency directory.
+
+
+For a real macOS desktop WebView check, run `bash test/native/run.sh` from the repository root after browser tests stop. It exports the four public Counter routes with the Elixir task, builds an isolated copy of the ElixirKit wrapper using the installed native toolchain, and injects a test-only startup driver. The driver loads the live test site, interrupts import after a committed batch, reloads and resumes, verifies binary gzip storage, then opens an imported counter offline. Logs and generated sources remain in `.fow/native-test/`. This checks the importer in WKWebView; it does not implement the generated wrappers' production cold-start handoff.

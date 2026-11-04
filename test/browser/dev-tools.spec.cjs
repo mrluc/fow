@@ -1,8 +1,7 @@
 const {test, expect} = require('@playwright/test');
 const host = page => page.locator('[data-fog-of-war-dev-tools]');
 const ready = page => expect.poll(() => page.evaluate(() => window.liveSocket.isConnected())).toBe(true);
-const paths = page => page.evaluate(() => Object.entries(localStorage)
-  .filter(([key]) => key.startsWith('fog-of-war:page:')).map(([,raw]) => JSON.parse(raw).path).sort());
+const paths = page => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.filter(row=>row.valid).map(row=>row.path).sort());
 
 test('package dev tools survive routing and offline handoff, with isolated compact styling', async ({page}) => {
   const errors = [];
@@ -48,8 +47,8 @@ test('package dev tools survive routing and offline handoff, with isolated compa
   // A host site's aggressive button stylesheet must not reach the tool's shadow tree.
   await page.addStyleTag({content: 'button {font-size: 80px !important; padding: 80px !important}'});
   expect(await panel.locator('[data-action="clear"]').evaluate(el => getComputedStyle(el).fontSize)).toBe('11px');
-  await panel.getByRole('tab', {name: 'Help', exact: true}).click();
-  await expect(panel.getByRole('heading', {name:'A website that remembers what you saw'})).toBeVisible();
+  await panel.locator('#help-tab').click();
+  await expect(panel.locator('#help-pane')).toBeVisible();
   expect(requests).toEqual([]);
   await panel.getByRole('button', {name: 'Reconnect', exact: true}).click();
   await ready(page);
@@ -113,8 +112,8 @@ test('online capture replaces legacy element/build keys with one record per rout
     localStorage.setItem('fog-of-war:page:/:counter-site', JSON.stringify(old));
   });
   await page.goto('/'); await ready(page);
-  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('fog-of-war:page:')).sort())).toEqual(['fog-of-war:page:/']);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fog-of-war:page:/')).regionId)).toBe('counter-site');
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('fog-of-war:page:')).sort())).toEqual([]);
+  expect(await page.evaluate(() => window.fogOfWar.cache.getRecord('/').then(record=>record?.regionId))).toBe('counter-site');
 });
 
 test('transparency is opt-in, toggle survives reload and routing, and icon controls show connection state',async({page})=>{

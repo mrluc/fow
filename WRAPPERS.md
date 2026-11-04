@@ -188,3 +188,6 @@ The generated macOS app is at `elixir-client/.cache/tauri-target/release/bundle/
 ### Source-generation cost measured in this workspace
 
 With four Counter routes, the cache export held 2,385 gzip payload bytes. Desktop source generation took 0.78 seconds with about 97 MiB maximum resident memory and produced 152 KiB on disk; Mob source generation took 2.22 seconds with about 95 MiB maximum resident memory and produced 1.3 MiB. These are local measurements, not performance guarantees. The existing Mob archive was reused via `MIX_ARCHIVES`; neither run installed dependencies or compiled a native binary. Both generated projects' Elixir sources parsed, and all copied compressed records decoded and matched their routes.
+
+
+The client now exposes `coordinator.cache.importBundle(indexURL, options)` for these gzip files. It imports into IndexedDB in resumable batches and preserves compatible device captures. See the README for the API and native `readAsset` bridge. The generated wrappers still use their older startup/seed mechanism; automatic native-host integration is a separate step. The macOS native smoke test exercises the new importer in an actual ElixirKit/Tauri WebView without claiming that the production generator already performs that integration.

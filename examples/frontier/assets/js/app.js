@@ -17,7 +17,7 @@ window.fogOfWar = fogOfWar
 // Real public HTTP renders, not invented client states. This is example-specific preloading.
 // Never move the current tab's route protection while saving these neighboring pages.
 async function seedSurroundings() {
-  if (localStorage.getItem('frontier:seed:v2')) return
+  await fogOfWar.cache.ready
   for (const path of ['/lat/0/lon/1', '/lat/1/lon/0', '/lat/1/lon/1']) {
     if (fogOfWar.cache.find(new URL(path, location.href))) continue
     const response = await fetch(path, {credentials:'same-origin', headers:{Accept:'text/html'}})

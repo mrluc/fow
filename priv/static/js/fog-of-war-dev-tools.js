@@ -94,8 +94,8 @@ function mountDevTools(el, coordinator) {
       if(version!==refreshVersion)return
       rows=result.rows
       get('[data-count]').textContent=String(rows.length)
-      get('[data-total]').textContent=`${rows.length} · ${bytes(result.bytes)}`
-      get('[data-total]').title='Saved pages · estimated localStorage UTF-16 bytes, keys and values included.'
+      get('[data-total]').textContent=`${rows.length} · ${bytes(result.bytes)} · ${result.backend}`
+      get('[data-total]').title=result.backend==='localStorage'?'localStorage fallback · estimated UTF-16 keys and values':`${result.backend} · encoded payload and metadata bytes, excluding database overhead. ${result.storageReason || ''}`
       const clear=get('[data-action="clear"]')
       clear.disabled=!result.canClear||!rows.some(row=>row.valid&&!row.open)
       clear.title=result.canClear?'Clear saved pages except routes open in Fog of War tabs':result.reason

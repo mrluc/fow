@@ -33,9 +33,8 @@ export const FogOfWar = {
       savedAt: new Date().toISOString(), html: this.el.outerHTML,
     }
     try {
-      const key = `fog-of-war:page:${path}`
-      const stored = await coordinator.cache.save(snapshot)
-      if (localStorage.getItem(key) === stored) {
+      await coordinator.cache.save(snapshot)
+      if (coordinator.cache.find(new URL(path, location.href))?.savedAt === snapshot.savedAt) {
         const preview = document.getElementById("snapshot-source")
         if (preview) preview.textContent = JSON.stringify(snapshot, null, 2)
         const status = document.getElementById("snapshot-status")

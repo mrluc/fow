@@ -26,7 +26,7 @@ test('app styling follows offline state and cached destinations across routing a
   // Cross-tab removals must update styling without a DOM patch or reload.
   const sibling = await page.context().newPage();
   await sibling.goto('/counters/three');
-  await sibling.evaluate(() => localStorage.removeItem('fog-of-war:page:/counters/one'));
+  await sibling.evaluate(() => window.fogOfWar.cache.remove('/counters/one'));
   await expect(one).toHaveClass(/fow-nav-uncached/);
   await sibling.close();
   await panel.getByRole('button', {name: 'Reconnect', exact: true}).click();

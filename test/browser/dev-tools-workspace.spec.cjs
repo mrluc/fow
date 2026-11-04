@@ -26,8 +26,9 @@ test('unified timeline records denied and cached navigation in memory, filters a
   await panel.getByRole('checkbox',{name:'Nav',exact:true}).check();
   await expect(panel.locator('tr[data-kind="cache"]')).toHaveCount(0);
   await expect(panel.locator('tr[data-outcome="denied"]')).toBeVisible();
-  const stored=await page.evaluate(()=>Object.keys(localStorage));
-  expect(stored.every(key=>key.startsWith('fog-of-war:page:'))).toBe(true);
+  const stored=await page.evaluate(async()=>({keys:Object.keys(localStorage),backend:(await window.fogOfWar.cache.inspect()).backend}));
+  expect(stored.backend).toBe('indexedDB');
+  expect(stored.keys).toEqual([]);
   await panel.locator('#help-tab').click();
   await expect(panel.getByRole('heading',{name:'Why this fits LiveView'})).toBeVisible();
   await expect(panel.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();

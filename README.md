@@ -133,7 +133,7 @@ The hook above is the primary interface. If you prefer an Elixir markup helper, 
 
 ## Storage and account policy
 
-Snapshots are stored in this browser’s `localStorage`. Logged-in content can be cached when that is appropriate for the application; this does not publish it or put it in a public preload bundle. The application decides which pages should remain on the device and which must remain online-only.
+Snapshots are stored in this browser’s IndexedDB, with compressed HTML kept as binary. Fog of War falls back to localStorage if its IndexedDB write/read probe fails; if both are blocked, the cache lasts only for the current document. Logged-in content can be cached when that is appropriate for the application; this does not publish it or put it in a public preload bundle. The application decides which pages should remain on the device and which must remain online-only.
 
 Fog of War does not encrypt snapshots, partition them by account, or clear them on logout. Account scoping, invalidation, expiration and logout cleanup need to be designed before using this prototype for account-specific production data. The current `fog-of-war:page:` storage prefix is a historical namespace, not an access-control setting or a restriction to public content.
 
@@ -174,7 +174,7 @@ Use `scale={0.9}` on `<FogOfWar.dev_tools>` to shrink its text, controls, and sp
 
 Use `<FogOfWar.dev_tools socket={@socket} semi_transparent={true} />` to start the panel semi-transparent (default: `false`). The overlapping-squares icon beside the tabs toggles this preference for the current tab, including across navigation and reloads. The pause/play button disconnects or reconnects the socket.
 
-The small launcher expands into a floating, dockable toolbar. Its header always shows the Live / Disconnected status and a pause/play control. **Cache** combines saved pages with in-memory navigation attempts, live arrivals, cached visits and denials. Cache/Nav checkboxes filter the rows; the default order is newest first and every column is sortable. Vsn means the stored record format; the renderer compatibility tag remains in the selected page's details. Select a saved page to read its decoded HTML and metadata, or a navigation event for its outcome and reason. Sizes estimate localStorage's UTF-16 keys and values, not browser disk usage.
+The small launcher expands into a floating, dockable toolbar. Its header always shows the Live / Disconnected status and a pause/play control. **Cache** combines saved pages with in-memory navigation attempts, live arrivals, cached visits and denials. Cache/Nav checkboxes filter the rows; the default order is newest first and every column is sortable. Vsn means the stored record format; the renderer compatibility tag remains in the selected page's details. Select a saved page to read its decoded HTML and metadata, or a navigation event for its outcome and reason. The footer names the storage backend. IndexedDB sizes count encoded payload and metadata bytes, excluding database overhead; the localStorage fallback estimates UTF-16 keys and values.
 
 **Clear unused** removes only Fog of War page entries for routes that are not open in cooperating Fog of War tabs on this origin. Every initialized tab holds a shared Web Lock for its current route, including while reading cached pages. Registration and clearing share a maintenance lock; this uses live browser ownership rather than expiring timestamps. Closing the document releases its locks. Unreadable records are preserved because their route cannot be verified. If Web Locks is unavailable, inspection still works and clearing is disabled. Older clients and tabs that do not initialize Fog of War cannot advertise their open routes; this is not a browser-wide tab inventory.
 
@@ -267,16 +267,20 @@ For non-link navigation decoration, `class="fow-nav" data-fog-of-war-to="/destin
 
 ## Compressed browser storage
 
-New snapshots gzip their HTML and store it as base64 in localStorage, leaving route, build, title and timestamp metadata readable. Compression is used only when the complete encoded record is smaller. Existing uncompressed snapshots remain readable and are replaced on the next successful capture. Browsers without the native compression/decompression APIs continue saving plain HTML.
+New snapshots gzip their HTML and store the compressed bytes directly in IndexedDB. Route, build, title and timestamp metadata are stored separately, so startup reads the route directory without loading every page's HTML. Offline navigation reads and decompresses only the requested region; successful online navigation uses LiveView and saves the result afterward. Browsers without the native compression/decompression APIs save plain HTML.
 
-Compression/decompression is asynchronous and uses the browser's built-in streams; no extra JavaScript dependency is required. Writes preserve capture order. Offline presentation decompresses the saved HTML before restoring it, and the developer tools report the size actually stored, including base64 and metadata overhead. The snapshot inspector continues showing decoded HTML. Compression reduces storage; it does not encrypt cached content.
+Compression uses the browser's built-in streams and adds no JavaScript dependency. Writes preserve capture order, and other tabs receive cache-change notifications after commits. The inspector shows decoded HTML. Compression reduces storage; it does not encrypt cached content.
+
+Existing plain and gzip/base64 localStorage records migrate automatically. Each source record remains until its IndexedDB transaction commits; unreadable records and records that could not migrate stay in localStorage. A newer compatible device record wins over an older legacy copy. A later IndexedDB quota error does not silently switch the cache to another backend.
+
+The temporary route directory belongs to Fog of War's JavaScript in the browser tab or native WebView. It is rebuilt from IndexedDB at startup and updated after captures, imports and cross-tab changes. Native Elixir code does not maintain a second directory.
 
 
 ### Developer-tool layout and navigation history
 
-Drag anywhere in the header to snap to a corner or the top/bottom center. Controls still respond to ordinary clicks. During dragging, highlighted dock targets and a label beside the pointer show where the panel will land; Escape cancels. Corners allow width/height resizing with the corner handle. Top and bottom centers span the viewport and have a full-width resize strip with a centered grip on the free edge. Drag the vertical divider to resize the list/detail split. Arrow keys operate the grip, resize handle and divider. Layout preferences use sessionStorage and survive live navigation and reloads. They are separate from the cached pages in localStorage.
+Drag anywhere in the header to snap to a corner or the top/bottom center. Controls still respond to ordinary clicks. During dragging, highlighted dock targets and a label beside the pointer show where the panel will land; Escape cancels. Corners allow width/height resizing with the corner handle. Top and bottom centers span the viewport and have a full-width resize strip with a centered grip on the free edge. Drag the vertical divider to resize the list/detail split. Arrow keys operate the grip, resize handle and divider. Layout preferences use sessionStorage and survive live navigation and reloads. They are separate from the cached pages in IndexedDB.
 
-Navigation events are bounded to 200 records in this document's memory. They never enter localStorage or the exported public bundle. A full reload starts a fresh timeline, including any new initial LiveView arrival. An attempt is updated when the navigation completes or is denied; a stored page remains a separate record showing its latest capture. Clear nav removes only these events; Clear unused retains its existing cross-tab protection. Help explains read-only remembered pages, server-driven UI, stale values and the difference between record versions and compatibility tags.
+Navigation events are bounded to 200 records in this document's memory. They never enter persistent storage or the exported public bundle. A full reload starts a fresh timeline, including any new initial LiveView arrival. An attempt is updated when the navigation completes or is denied; a stored page remains a separate record showing its latest capture. Clear nav removes only these events; Clear unused retains its existing cross-tab protection. Help explains read-only remembered pages, server-driven UI, stale values and the difference between record versions and compatibility tags.
 
 ### Working on the package through an example
 
@@ -286,4 +290,29 @@ Restart the example server after changing configuration or dependencies in `mix.
 
 ### Export public preload records without browser tooling
 
-`mix fow.export.cache --env dev --output .fow/cache/dev --debug` fetches the selected public routes and writes a path index plus binary gzip records using Elixir alone. Manifest `envs` override top-level defaults recursively; lists replace rather than concatenate. Native generators accept the same `--env` selection, and flat schema-1 manifests remain supported. See [environment selection and cache export](WRAPPERS.md#environment-overrides-and-browser-free-cache-export) for the format, debug output, and current limits. IndexedDB importing is a separate next step, not part of this export task.
+`mix fow.export.cache --env dev --output .fow/cache/dev --debug` fetches the selected public routes and writes a path index plus binary gzip records using Elixir alone. Manifest `envs` override top-level defaults recursively; lists replace rather than concatenate. Native generators accept the same `--env` selection, and flat schema-1 manifests remain supported. See [environment selection and cache export](WRAPPERS.md#environment-overrides-and-browser-free-cache-export) for the format, debug output, and current limits. The browser importer reads this index and commits the compressed records to IndexedDB in bounded batches; see below.
+
+
+### Importing a public bundle
+
+After `installFogOfWar` returns the coordinator, its cache can import the files produced by `mix fow.export.cache`:
+
+```js
+const fogOfWar = installFogOfWar(liveSocket)
+liveSocket.connect()
+await fogOfWar.cache.importBundle("/offline-bundle/index.json", {
+  batchSize: 16,
+  byteBudget: 1024 * 1024,
+  onProgress: ({completed, total}) => console.log(`${completed}/${total}`)
+})
+```
+
+Serve the index and its `pages/` directory together. The index's origin must match the page's actual origin and its records must match the client's compatibility build. The importer verifies each compressed file's SHA-256 and byte count before writing. Existing compatible pages captured on the device are preserved, even if the bundled capture is newer. A newer bundle may replace an older bundled record. Completed batches and their progress marker commit in one transaction, so calling the importer again after interruption or reload resumes missing work. Pass an `AbortSignal` as `signal` to stop between batches or cancel a fetch.
+
+`batchSize` limits routes per transaction; `byteBudget` limits buffered compressed payload bytes. A single record may exceed that budget, up to the importer's current 2,100,000-byte compressed-record limit. The importer processes one payload at a time and yields between committed batches. It does not decompress all pages at startup. Bulk importing requires IndexedDB; the smaller fallback cache still accepts ordinary captures.
+
+A native host can pass a parsed index plus `readAsset: async (relativePath, {signal}) => Uint8Array` instead of serving bundle files over HTTP. That bridge must return the original gzip bytes; do not base64-encode them. The native wrapper generators have not yet wired this importer into their startup flow.
+
+`await fogOfWar.cache.ready` waits for backend selection and migration; it resolves to `"indexedDB"`, `"localStorage"` or `"memory"`. `await fogOfWar.cache.flush()` also waits for pending captures. Browser storage remains subject to quota and eviction; importing a bundle does not grant persistent-storage permission.
+
+On macOS, `bash test/native/run.sh` builds the cached ElixirKit example and runs its actual WKWebView through export, interrupted import, reload/resume, binary gzip decoding and offline navigation. It needs the existing desktop build dependencies and does not build Android. Test projects and logs are written beneath `.fow/native-test/`.
