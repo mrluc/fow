@@ -301,6 +301,27 @@ defmodule FogOfWar.Wrapper.Generator do
       File.write!(gradle, source)
     end
 
+    # BSD cp's sparse-file optimization can zero the ELF header of an NDK-linked
+    # library on macOS. Copy densely on the host; Linux cp has no -S option.
+    zig = Path.join(stage, "android/app/src/main/jni/build.zig")
+
+    if File.regular?(zig) do
+      source = File.read!(zig)
+      copy = ~s|const cp = b.addSystemCommand(&.{"cp"});|
+
+      unless length(:binary.matches(source, copy)) == 2,
+        do: Mix.raise("Unexpected Mob Android library-copy steps; review the pinned scaffold")
+
+      File.write!(
+        zig,
+        String.replace(
+          source,
+          copy,
+          copy <> "\n    if (@import(\"builtin\").os.tag == .macos) cp.addArg(\"-S\");"
+        )
+      )
+    end
+
     android_manifest = Path.join(stage, "android/app/src/main/AndroidManifest.xml")
 
     if File.exists?(android_manifest) do

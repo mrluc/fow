@@ -50,6 +50,41 @@ defmodule FogOfWar.MobileGeneratorTest do
     %{root: root, path: path, native_root: native_root, webview: webview, scaffold: scaffold}
   end
 
+  test "native library copies are dense on macOS and unknown scaffold copies fail safely", ctx do
+    for count <- [2, 1] do
+      scaffold = fn stage, app, manifest ->
+        ctx.scaffold.(stage, app, manifest)
+        file = Path.join(stage, "android/app/src/main/jni/build.zig")
+        File.mkdir_p!(Path.dirname(file))
+
+        File.write!(
+          file,
+          String.duplicate(~s|const cp = b.addSystemCommand(&.{"cp"});| <> "\n", count)
+        )
+      end
+
+      output = Path.join(ctx.root, "copies-#{count}")
+
+      if count == 2 do
+        Generator.run!(:mob, ctx.path, output, scaffold: scaffold)
+        source = File.read!(Path.join(output, "android/app/src/main/jni/build.zig"))
+
+        assert length(
+                 :binary.matches(
+                   source,
+                   ~s|if (@import("builtin").os.tag == .macos) cp.addArg("-S");|
+                 )
+               ) == 2
+      else
+        assert_raise Mix.Error, ~r/Unexpected Mob Android library-copy steps/, fn ->
+          Generator.run!(:mob, ctx.path, output, scaffold: scaffold)
+        end
+
+        refute File.exists?(output)
+      end
+    end
+  end
+
   test "mobile generation consumes separate native bundles, uses plugin and has no legacy wrapper controls",
        ctx do
     output = Path.join(ctx.root, "generated")

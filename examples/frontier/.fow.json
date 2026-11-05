@@ -2,7 +2,14 @@
   "schema": 2,
   "default_env": "dev",
   "envs": {
-    "dev": {}
+    "dev": {},
+    "android-dev": {
+      "mob": {
+        "platforms": [
+          "android"
+        ]
+      }
+    }
   },
   "app": {
     "name": "Frontier",

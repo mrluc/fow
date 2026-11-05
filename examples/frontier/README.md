@@ -49,3 +49,27 @@ For a single-command rebuild and local installation, run `mix fow.desktop --forc
 The resulting `Frontier.app` is under `$CARGO_TARGET_DIR/release/bundle/macos/` (or the generated project's `src-tauri/target/release/bundle/macos/` without that environment variable). Copy it into `~/Applications` to launch it from Spotlight. It is locally signed for development, not notarized for distribution.
 
 From the package root, `node test/native/frontier-smoke.cjs` tests the actual generated desktop app's terrain, logo loading, IndexedDB cache, offline movement, denied uncached movement, and Back navigation. It temporarily injects a test driver, then restores the source and rebuilds the ordinary app before returning.
+
+
+## Android app generated from Frontier
+
+The `android-dev` manifest environment selects Android only. With Frontier's Phoenix server running, generate and build from this example directory:
+
+```sh
+mix fow.bundle.prepare --env android-dev --platform android
+mix fow.gen.mob --env android-dev --output .fow/apps/mob/android-dev
+cd .fow/apps/mob/android-dev
+./build.sh --android
+```
+
+The generated app is **Frontier**, with application ID `dev.fogofwar.frontier`. It fetches the pinned WebView package from Git, includes the public startup document, compressed routes and artwork, and has no wrapper toolbar. Its HomeScreen contains no test hooks. The repository is private for now, so dependency fetching requires GitHub SSH access. The build uses the normal Mob toolchain and existing runtime caches; it does not use the older Counter test host.
+
+From the generated project directory, this native test clears that development app's WebView data, opens it without website forwarding, checks the bundled routes and canvas-readable artwork, then restores forwarding and requires recovery on the chosen route followed by live navigation:
+
+```sh
+MOB_WEBVIEW_ANDROID_DEVICE=emulator-5554 mix run --no-start ../../../../../../test/native/mob-frontier.exs
+```
+
+Android ARM64 emulator execution passed from this generated project. The debug build also compiled ARM32 and x86_64 libraries; those architectures were not run. The generator emits dense library copies on macOS to avoid sparse-copy corruption of NDK output, and refuses an unfamiliar upstream copy layout. No generated source files need manual repair.
+
+Bundle preparation refuses an existing destination. For another export, use a fresh `--output` directory, then pass its parent as `--bundle-dir` to generation. Generator `--force` replaces the entire generated project, including its local dependencies and build outputs; keep any custom changes elsewhere.
