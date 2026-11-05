@@ -6,6 +6,9 @@
 @media (max-width: 799px) {
   .map-viewport { touch-action: none; user-select: none; cursor: grab; }
   .map-viewport.is-panning, .map-viewport.is-panning .tile-target { cursor: grabbing; }
-  .map-viewport.pannable .map-scene { view-transition-name: frontier-world; }
+  .map-viewport.pannable .scout.walking { animation: frontier-stride 160ms steps(1, end) 4; }
 }
-::view-transition-group(frontier-world) { animation-duration: 650ms; animation-timing-function: linear; }
+@keyframes frontier-stride {
+  0%, 100% { background-image: url('/images/scout-idle.png'); }
+  50% { background-image: url('/images/scout-walk.png'); }
+}

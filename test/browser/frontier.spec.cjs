@@ -2,6 +2,7 @@ const {test, expect} = require('@playwright/test');
 test.use({baseURL: 'http://127.0.0.1:47192'});
 const snapshotPaths = page => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.filter(row=>row.valid).map(row=>row.path).sort());
 test('procedural 4×4 world seeds three real neighbors, animates the scout, and navigates cached coordinates offline', async ({page}) => {
+  await page.setViewportSize({width:900,height:800});
   const errors=[]; page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => {
     const start=document.startViewTransition.bind(document);

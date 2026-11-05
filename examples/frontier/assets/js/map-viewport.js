@@ -64,7 +64,7 @@ export function installMapViewport() {
       Number(getComputedStyle(a).zIndex)-Number(getComputedStyle(b).zIndex))
     for (const tree of trees) sprite(pine, tree, isFogged(tree.parentElement))
     const player = document.getElementById('player')
-    if (player) sprite(player.classList.contains('walking') ? walking : idle, player, false)
+    if (player) sprite(getComputedStyle(player).backgroundImage.includes('scout-walk') ? walking : idle, player, false)
     m.globalCompositeOperation = 'source-over'
     const silhouette = m.getImageData(0, 0, width, height).data
     const fog = ctx.createImageData(width, height)
