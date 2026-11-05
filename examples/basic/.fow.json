@@ -28,8 +28,7 @@
     "paths": [
       "/",
       "/counters/one",
-      "/counters/two",
-      "/counters/three"
+      "/counters/two"
     ],
     "static_root": "priv/static"
   },
@@ -53,6 +52,13 @@
       },
       "app": {
         "identifier": "dev.fogofwar.counters.production"
+      }
+    },
+    "android-dev": {
+      "mob": {
+        "platforms": [
+          "android"
+        ]
       }
     }
   }
