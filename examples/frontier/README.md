@@ -144,3 +144,8 @@ fly secrets set --app fow \
 ```
 
 Visit `https://fow.fly.dev/dev/game` and enter those credentials in the browser prompt. HTTP Basic Auth protects the initial request; a signed-session proof is checked again on LiveView mount in its separate `live_session`. Missing/wrong credentials return 401. An enabled production inspector without a password still returns 404. Changing the password invalidates old mount proofs. Local development remains open unless a password is configured.
+
+
+Frontier explicitly uses `<FogOfWar.dev_tools enabled={true} ... />` so the public demo includes the tools in production. Other applications can set `enabled={@user.can_debug}`; an explicit boolean overrides application configuration.
+
+The game inspector lists player LiveView process memory and mailbox length from one-second PubSub samples. It totals currently reported views, counts separate tabs separately, and drops reports at three seconds old (swept once per second). Reporting continues while the game is paused. These are allocated process bytes from `Process.info/2`, without forced garbage collection; shared reference-counted binary storage, socket processes and ETS are not included.

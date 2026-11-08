@@ -21,7 +21,7 @@ defmodule FogOfWar do
     """
   end
 
-  @doc "Mounts the package's sticky developer tools. Controlled by `config :fow, dev_tools: true`."
+  @doc "Mounts the package's sticky developer tools. The `enabled={true | false}` attribute overrides `config :fow, dev_tools: true`; omit it to use configuration. This can be an application authorization expression."
   attr(:socket, :any, required: true)
   attr(:enabled, :boolean, default: nil)
 

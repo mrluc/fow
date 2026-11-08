@@ -65,7 +65,7 @@ defmodule FogOfWarFrontierWeb.MapScene do
         </div>
       </main>
     </FogOfWar.region>
-    <FogOfWar.dev_tools socket={@socket} semi_transparent={true} scale={1.1} />
+    <FogOfWar.dev_tools socket={@socket} enabled={true} semi_transparent={true} scale={1.1} />
     """
   end
 end

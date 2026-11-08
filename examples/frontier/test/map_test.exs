@@ -13,7 +13,11 @@ defmodule FogOfWarFrontier.MapTest do
       )
 
     assert has_element?(view, "#player.at-0-0")
-    refute has_element?(view, "header, aside, footer, h1, h2")
+
+    refute has_element?(
+             view,
+             "#frontier-map header, #frontier-map aside, #frontier-map footer, #frontier-map h1, #frontier-map h2"
+           )
 
     for path <- ["/lat/0/lon/1", "/lat/1/lon/0", "/lat/1/lon/1"],
         do: assert(has_element?(view, "a[href='#{path}']"))

@@ -10,6 +10,8 @@ defmodule FogOfWarFrontierWeb.MultiLive do
     if connected?(socket),
       do: Phoenix.PubSub.subscribe(FogOfWarFrontier.PubSub, Game.topic(server))
 
+    if connected?(socket), do: Process.send_after(self(), :report_memory, 1000)
+
     socket =
       assign(socket,
         lat: 0,
@@ -83,6 +85,19 @@ defmodule FogOfWarFrontierWeb.MultiLive do
   end
 
   def handle_params(_, _, socket), do: {:noreply, push_navigate(socket, to: path(0, 0))}
+
+  def handle_info(:report_memory, socket) do
+    alias FogOfWarFrontier.Game.LiveMemory
+
+    Phoenix.PubSub.broadcast(
+      FogOfWarFrontier.PubSub,
+      LiveMemory.topic(socket.assigns.game_server),
+      {:live_memory, LiveMemory.sample(socket.assigns.player_id)}
+    )
+
+    Process.send_after(self(), :report_memory, 1000)
+    {:noreply, socket}
+  end
 
   def handle_info({:game_tick, server, _}, %{assigns: %{game_server: server}} = socket) do
     game = read(server)

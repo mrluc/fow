@@ -10,7 +10,40 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
     if connected?(socket),
       do: Phoenix.PubSub.subscribe(FogOfWarFrontier.PubSub, Game.topic(server))
 
-    {:ok, assign(socket, game_server: server, game: read(server), square: {0, 0}, selected: nil)}
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(FogOfWarFrontier.PubSub, Game.LiveMemory.topic(server))
+      Process.send_after(self(), :prune_memory, 1000)
+    end
+
+    {:ok,
+     assign(socket,
+       memory_samples: %{},
+       game_server: server,
+       game: read(server),
+       square: {0, 0},
+       selected: nil
+     )}
+  end
+
+  def handle_info({:live_memory, sample}, socket) do
+    now = System.monotonic_time(:millisecond)
+
+    samples =
+      socket.assigns.memory_samples
+      |> Game.LiveMemory.prune(now)
+      |> Map.put(sample.view_id, Map.put(sample, :received_at, now))
+
+    {:noreply, assign(socket, memory_samples: samples)}
+  end
+
+  def handle_info(:prune_memory, socket) do
+    Process.send_after(self(), :prune_memory, 1000)
+
+    {:noreply,
+     assign(socket,
+       memory_samples:
+         Game.LiveMemory.prune(socket.assigns.memory_samples, System.monotonic_time(:millisecond))
+     )}
   end
 
   def handle_info({:game_tick, server, _}, %{assigns: %{game_server: server}} = socket) do
@@ -72,6 +105,8 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
       player -> {:noreply, assign(socket, selected: id, square: player.position)}
     end
   end
+
+  defp memory_size(bytes), do: "#{Float.round(bytes / 1024, 1)} KiB"
 
   defp read(Game), do: GameMap.snapshot()
   defp read(server), do: Game.snapshot(server)
@@ -173,6 +208,32 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
           </div>
         </section>
         <section>
+          <section id="live-memory" aria-label="Player LiveView memory">
+            <h2>Player LiveView memory</h2>
+            <p>
+              <b id="live-memory-total">{memory_size(
+                Enum.sum(for {_, sample} <- @memory_samples, do: sample.bytes)
+              )}</b>
+              total · {map_size(@memory_samples)} connected views
+            </p>
+            <p>
+              Per-process memory, sampled each second. Excludes shared binaries, socket processes and ETS. Multiple tabs are separate views. Reports expire after 3 seconds.
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Player</th><th>LiveView</th><th>Memory</th><th>Mailbox</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr :for={{id, sample} <- Enum.sort(@memory_samples)} data-memory-view={id}>
+                  <td>{sample.player_id}</td><td>{id}</td><td>{memory_size(sample.bytes)}</td><td>
+                    {sample.messages}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
           <h2>Players</h2>
           <ul id="debug-players">
             <li :for={{id, player} <- Enum.sort(@game.players)}>
