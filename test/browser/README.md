@@ -46,7 +46,7 @@ The model's `online` event is a deterministic retry trigger. Capped background r
 
 `server.sh` starts `scripts/browser-server.exs`, which loads `scripts/browser-fixtures.exs`. The permanent tests use real HTTP responses for the transformed pages, rather than depending on synthetic top-level browser responses. The model reads the permanent public bundle fixture at `test/browser/fixtures/public-bundle.json`, copied from a reviewed export of the Counter example. It does not require a leftover `.fow` build folder. Refresh the fixture deliberately when changing the example's pages; tests do not silently make missing offline content appear.
 
-Other checks remain separate: `wrapper-smoke.cjs` is a standalone smoke check for a running generated public-shell host, and `docs/adr/probes/` contains the earlier source/native characterization probes. [ADR 0001](../../docs/adr/0001-seamless-public-startup-recovery.md) records the proposed startup contract and native rollout gate.
+For a native macOS WebView test, run `node test/native/frontier-outage.cjs` after sourcing `../env.sh`. It generates an isolated Frontier app and stops and restarts the actual Phoenix process.
 
 ## Full rendered LiveView cold-start tests
 
@@ -61,4 +61,4 @@ Synthetic top-level HTML delivery initially triggered Chrome's local-network acc
 The independent Frontier app is exercised by `frontier.spec.cjs`, on port 47192. Counter/fixture servers use 47182 and 47183. `transitions.spec.cjs` tests directional online/offline navigation and reduced motion. `FOG_OF_WAR_BROWSER_NODE_MODULES` can override the local browser dependency directory.
 
 
-For a real macOS desktop WebView check, run `bash test/native/run.sh` from the repository root after browser tests stop. It exports the four public Counter routes with the Elixir task, builds an isolated copy of the ElixirKit wrapper using the installed native toolchain, and injects a test-only startup driver. The driver loads the live test site, interrupts import after a committed batch, reloads and resumes, verifies binary gzip storage, then opens an imported counter offline. Logs and generated sources remain in `.fow/native-test/`. This checks the importer in WKWebView; it does not implement the generated wrappers' production cold-start handoff.
+For a native macOS WebView test, run `node test/native/frontier-outage.cjs` after sourcing `../env.sh`. It generates an isolated Frontier app and stops and restarts the actual Phoenix process.

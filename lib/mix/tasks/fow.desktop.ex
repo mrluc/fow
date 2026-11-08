@@ -1,7 +1,14 @@
 defmodule Mix.Tasks.Fow.Desktop do
   use Mix.Task
-  @shortdoc "Export, generate, build and install a local macOS desktop app"
-  @moduledoc "Run `mix fow.desktop --force` to replace generated artifacts and the installed app. `--output` is the generated source project; `--applications` selects the installation directory."
+  @shortdoc "Prepare, build and install the macOS WebKit app"
+  @moduledoc """
+  Prepare the Apple bundle, generate and build the macOS app, and register it with Spotlight.
+
+  Run `mix fow.desktop --force` while the capture site is reachable. The flag replaces
+  the prepared bundle, generated project, and installed app. Use `--output` to select
+  the generated project and `--applications` to select the installation directory
+  (defaults to `~/Applications`).
+  """
   def run(args) do
     Mix.Task.run("app.config")
 

@@ -1,0 +1,48 @@
+//! Embedded desktop bundle support. Include this module from the generated Tauri crate.
+
+use tauri::WebviewWindow;
+
+/// Initial document served by the local bundle loader.
+pub const FOW_STARTUP_HTML: &[u8] = include_bytes!("../../priv/fog_of_war/apple/startup.html");
+
+/// Returns bytes and MIME type for an exact allowlisted custom-scheme URL.
+pub fn fow_asset(url: &str) -> Option<(&'static [u8], &'static str)> {
+    match url {
+<%= for {url_json, relative_file_json, mime_json} <- @native_files do %>
+        <%= url_json %> => Some((include_bytes!(concat!("../../priv/fog_of_war/apple/", <%= relative_file_json %>)), <%= mime_json %>)),
+<% end %>
+        _ => None,
+    }
+}
+
+/// Reads only the bundle index and generated gzip page files from the live origin.
+#[tauri::command]
+pub fn read_fow_bundle_asset(
+    window: WebviewWindow,
+    path: String,
+) -> Result<tauri::ipc::Response, String> {
+    let live: tauri::Url = <%= @live_json %>.parse().map_err(|_| "invalid configured origin".to_string())?;
+    let live_origin = live.origin().ascii_serialization();
+    let current_origin = window.url().map_err(|error| error.to_string())?.origin().ascii_serialization();
+    if current_origin != live_origin {
+        return Err("bundle assets are available only to the configured live origin".into());
+    }
+
+    match path.as_str() {
+        "index.json" => Ok(tauri::ipc::Response::new(include_bytes!("../../priv/fog_of_war/apple/index.json").to_vec())),
+<%= for relative_file_json <- @native_files |> Enum.map(&elem(&1, 1)) |> Enum.uniq(), Regex.match?(~r/^"pages\/[a-f0-9]{64}\.html\.gz"$/, relative_file_json) do %>
+        <%= relative_file_json %> => Ok(tauri::ipc::Response::new(include_bytes!(concat!("../../priv/fog_of_war/apple/", <%= relative_file_json %>)).to_vec())),
+<% end %>
+        _ => Err("asset path is not allowlisted".into()),
+    }
+}
+
+/// Install as a Tauri initialization script before loading the application page.
+pub const FOW_NATIVE_READ_ASSET_INIT: &str = r#"
+(() => {
+  window.__fogOfWarNativeReadAsset = async path => {
+    const bytes = await window.__TAURI_INTERNALS__.invoke('read_fow_bundle_asset', { path });
+    return Array.isArray(bytes) ? Uint8Array.from(bytes) : bytes;
+  };
+})();
+"#;

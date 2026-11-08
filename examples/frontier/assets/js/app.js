@@ -1,4 +1,7 @@
-import {installMapViewport} from "./map-viewport"
+import {FrontierEntities} from "./entities"
+import {installGameBars, FrontierPlayer} from "./game-bars"
+import {installDemoUI} from "./demo-ui"
+import {installMapViewport, preserveMapPresentation} from "./map-viewport"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {FogOfWar, installFogOfWar, FOG_OF_WAR_BUILD} from "fow"
@@ -8,17 +11,21 @@ const viewport = installMapViewport()
 const transitions = createMapTransitions(viewport.refresh)
 const liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: document.querySelector("meta[name='csrf-token']").content},
-  hooks: {FogOfWar}, dom: {onDocumentPatch: transitions.onDocumentPatch},
+  hooks: {FogOfWar, FrontierEntities, FrontierPlayer}, dom: {onBeforeElUpdated: preserveMapPresentation, onDocumentPatch: transitions.onDocumentPatch},
 })
 const fogOfWar = installFogOfWar(liveSocket, {transition: transitions.navigate})
 window.liveSocket = liveSocket
 window.fogOfWar = fogOfWar
+installDemoUI(fogOfWar)
+installGameBars(fogOfWar)
 
 // Real public HTTP renders, not invented client states. This is example-specific preloading.
 // Never move the current tab's route protection while saving these neighboring pages.
 async function seedSurroundings() {
   await fogOfWar.cache.ready
-  for (const path of ['/lat/0/lon/1', '/lat/1/lon/0', '/lat/1/lon/1']) {
+  const prefix = location.pathname.startsWith('/multi') ? '/multi' : ''
+  const rules = JSON.parse(document.getElementById('frontier-bars').dataset.gameRules)
+  for (const path of rules.preloaded_squares.map(([lat, lon]) => `${prefix}/lat/${lat}/lon/${lon}`)) {
     if (fogOfWar.cache.find(new URL(path, location.href))) continue
     const response = await fetch(path, {credentials:'same-origin', headers:{Accept:'text/html'}})
     if (!response.ok) throw new Error(`Preload ${path}: ${response.status}`)

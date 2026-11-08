@@ -183,7 +183,7 @@ defmodule FogOfWar.WrapperWorkflowTest do
     end
   end
 
-  test "desktop convenience refreshes export, generates, builds and installs", %{
+  test "desktop convenience prepares the Apple bundle, generates, builds and installs", %{
     root: root,
     path: path
   } do
@@ -195,7 +195,13 @@ defmodule FogOfWar.WrapperWorkflowTest do
       case command do
         "bash" ->
           assert opts[:cd] == project
-          assert File.regular?(Path.join(project, "priv/fog_of_war/bundle.json"))
+          bundle = Path.join(project, "priv/fog_of_war/apple")
+
+          assert Jason.decode!(File.read!(Path.join(bundle, "native.json")))["platform"] ==
+                   "apple"
+
+          assert File.read!(Path.join(bundle, "startup.html")) =~ "window.__fogOfWarNativeBundle="
+          assert File.read!(Path.join(project, "src-tauri/src/main.rs")) =~ "loadSimulatedRequest"
           File.mkdir_p!(Path.join(app, "Contents"))
           File.write!(Path.join(app, "Contents/Info.plist"), "plist")
 

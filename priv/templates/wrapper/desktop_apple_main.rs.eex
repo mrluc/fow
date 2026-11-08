@@ -1,0 +1,61 @@
+mod desktop_bundle;
+
+use desktop_bundle::{fow_asset, read_fow_bundle_asset, FOW_NATIVE_READ_ASSET_INIT, FOW_STARTUP_HTML};
+use objc2::AnyThread;
+use objc2_foundation::{NSData, NSString, NSURL, NSURLRequest, NSURLResponse};
+use objc2_web_kit::WKWebView;
+use tauri::http::{header, Response, StatusCode};
+
+fn main() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![read_fow_bundle_asset])
+        .register_uri_scheme_protocol("fog-of-war-assets", |_context, request| {
+            let url = request.uri().to_string();
+            let key = url.split('?').next().unwrap_or(&url);
+            let (bytes, mime, status) = match fow_asset(key) {
+                Some((bytes, mime)) => (bytes, mime, StatusCode::OK),
+                None => (&[][..], "text/plain", StatusCode::NOT_FOUND),
+            };
+            Response::builder()
+                .status(status)
+                .header(header::CONTENT_TYPE, mime)
+                .body(bytes)
+                .expect("build bundled asset response")
+        })
+        .setup(|app| {
+            let live: tauri::Url = <%= @live_json %>.parse()?;
+            let live_origin = live.origin();
+            let start_url = live.to_string();
+            let window = tauri::WebviewWindowBuilder::new(
+                app, "main", tauri::WebviewUrl::External("about:blank".parse()?),
+            )
+            .title(<%= @name_json %>)
+            .inner_size(<%= @width %>.0, <%= @height %>.0)
+            .initialization_script(FOW_NATIVE_READ_ASSET_INIT)
+            .on_new_window(|url, _features| {
+                if url.scheme() == "https" &&
+                    matches!(url.host_str(), Some("github.com") | Some("hex.pm")) {
+                    let _ = std::process::Command::new("/usr/bin/open").arg(url.as_str()).spawn();
+                }
+                tauri::webview::NewWindowResponse::Deny
+            })
+            .on_navigation(move |url| url.as_str() == "about:blank" || url.origin() == live_origin)
+            .build()?;
+            window.with_webview(move |platform| {
+                // Tauri gives us its WKWebView on the main thread.
+                let view = unsafe { &*platform.inner().cast::<WKWebView>() };
+                let url = NSURL::URLWithString(&NSString::from_str(&start_url))
+                    .expect("validated startup URL");
+                let request = NSURLRequest::requestWithURL(&url);
+                let response = NSURLResponse::initWithURL_MIMEType_expectedContentLength_textEncodingName(
+                    NSURLResponse::alloc(), &url, Some(&NSString::from_str("text/html")),
+                    FOW_STARTUP_HTML.len() as isize, Some(&NSString::from_str("utf-8")),
+                );
+                let data = NSData::with_bytes(FOW_STARTUP_HTML);
+                unsafe { view.loadSimulatedRequest_response_responseData(&request, &response, &data) };
+            })?;
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("run desktop wrapper");
+}

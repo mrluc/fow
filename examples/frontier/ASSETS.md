@@ -25,3 +25,5 @@ Use case: stylized-concept. One full-body human scout game sprite on genuine tra
 ### scout-walk.png
 
 Use case: precise-object-edit. Edit this transparent scout game sprite into ONE second animation frame. Preserve the same character identity, face, clothing, colors, upper-left lighting, painted retro RTS style, camera view, exact canvas dimensions, head position and overall scale. Change only pose: a modest walking step toward lower right, front leg a little forward, opposite arm subtly forward, cloak slightly shifted. Keep feet grounded on the same bottom baseline and body centered exactly like the original, so CSS can alternate these two PNGs without jumping. Not an action leap, not a new design. Genuine transparent background, no scene, no text, no extra panels. Entire character within original framing.
+
+The scout idle and walking PNGs were subsequently mirrored horizontally, including the top-level copies, originals, and 512px/256px variants. This changes their facing direction without regenerating the artwork.

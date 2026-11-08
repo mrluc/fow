@@ -10,5 +10,24 @@
     <script defer phx-track-static src="/assets/js/app.js">
     </script>
   </head>
-  <body>{@inner_content}</body>
+  <body>
+    {@inner_content}
+    <div id="frontier-connection" class="frontier-connection" role="group" aria-label="Server connection">
+      <button type="button" data-connection="connect" data-connection-toggle aria-pressed="false">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 7 41 24 14 41Z" /></svg>
+        <span class="frontier-display" data-label="connect">Connect</span>
+      </button>
+      <button type="button" data-connection="disconnect" data-connection-toggle disabled aria-pressed="true" class="is-active">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M11 7h9v34h-9zM28 7h9v34h-9z" /></svg>
+        <span class="frontier-display" data-label="disconnect">Disconnected</span>
+      </button>
+      <span class="sr-only" data-connection-announcement role="status">Disconnected</span>
+    </div>
+    <FogOfWarFrontierWeb.GameBars.bars />
+    <nav class="frontier-project-links" aria-label="Fog of War project">
+      <a href="https://github.com/mrluc/fow" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://hex.pm/packages/fow" target="_blank" rel="noopener noreferrer"
+        title="FoW package page, available when published">Hex</a>
+    </nav>
+  </body>
 </html>

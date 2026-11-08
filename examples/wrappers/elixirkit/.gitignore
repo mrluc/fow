@@ -1,6 +1,0 @@
-/deps/
-/_build/
-/src-tauri/target/
-/android/.gradle/
-/android/app/build/
-/mob.local.exs

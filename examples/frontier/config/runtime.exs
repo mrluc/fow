@@ -101,3 +101,10 @@ if config_env() == :prod do
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
 end
+
+# Development is open locally; production stays hidden unless explicitly enabled
+# with a password. Credentials are runtime secrets, never compiled into a bundle.
+config :fog_of_war_frontier, :inspector,
+  enabled: System.get_env("FRONTIER_INSPECTOR_ENABLED") == "true",
+  username: System.get_env("FRONTIER_INSPECTOR_USERNAME", "admin"),
+  password: System.get_env("FRONTIER_INSPECTOR_PASSWORD")

@@ -4,7 +4,13 @@ defmodule Mix.Tasks.Fow.Gen.Elixirkit do
   def run(args) do
     {opts, rest, invalid} =
       OptionParser.parse(args,
-        strict: [manifest: :string, output: :string, env: :string, force: :boolean]
+        strict: [
+          manifest: :string,
+          output: :string,
+          env: :string,
+          bundle_dir: :string,
+          force: :boolean
+        ]
       )
 
     if rest != [] || invalid != [], do: Mix.raise("Invalid generator arguments")
@@ -15,6 +21,7 @@ defmodule Mix.Tasks.Fow.Gen.Elixirkit do
 
     FogOfWar.Wrapper.Generator.run!(:elixirkit, manifest, output,
       env: opts[:env],
+      bundle_dir: opts[:bundle_dir],
       force: opts[:force]
     )
 

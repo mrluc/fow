@@ -49,6 +49,13 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   let message = ''
   let outlet = null
   let displayedURL = location.href
+  const initiallyRouted = Boolean(document.querySelector('[data-phx-main]'))
+  const mainUnavailable = () => {
+    const el = document.querySelector('[data-phx-main]')
+    const view = liveSocket.main
+    return !el || !view || view.el !== el || !el.isConnected || view.isDestroyed()
+  }
+  const mainReady = () => !mainUnavailable() && liveSocket.main.isConnected()
   const setText = (id, text) => {
     const el = document.getElementById(id)
     if (el && el.textContent !== text) el.textContent = text
@@ -76,8 +83,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   }
   const refresh = () => {
     refreshNavigationStyles()
-    const main = document.querySelector('[data-phx-main]')
-    const ready = liveSocket.isConnected() && main?.classList.contains('phx-connected')
+    const ready = liveSocket.isConnected() && mainReady()
     document.documentElement.dataset.connection = offline() ? 'paused' : ready ? 'live' : 'connecting'
     const counter = document.querySelector('#persistent-counter, #shell-press')
     if (counter) counter.disabled = offline() || !ready
@@ -154,20 +160,27 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     }, url)
     return true
   }
-  const toggleConnection = () => {
+  const toggleConnection = intent => {
     navigation++
-    if (offline() && snapshotMode) {
+    const connect = intent === 'connect' || (intent !== 'disconnect' && (offline() || !mainReady()))
+    if (connect && (snapshotMode || mainUnavailable() || (liveSocket.isConnected() && !mainReady()))) {
+      // A socket may serve sticky LiveViews even after its routed page was retired.
+      // Reconnecting that socket cannot resurrect the missing page owner.
+      paused = false
       location.assign(location.href)
       return
     }
-    if (unavailable) {
-      unavailable = false
-      paused = false
-      liveSocket.disconnect()
-    } else paused = !paused
     message = ''
-    if (paused) liveSocket.disconnect(refresh)
-    else liveSocket.connect()
+    if (connect) {
+      paused = false
+      if (unavailable) {
+        unavailable = false
+        liveSocket.disconnect(() => liveSocket.connect())
+      } else liveSocket.connect()
+    } else {
+      paused = true
+      liveSocket.disconnect(refresh)
+    }
     refresh()
   }
   document.addEventListener('click', event => {
@@ -177,11 +190,12 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     if (target?.closest('[data-connection-toggle]')) {
       event.preventDefault()
       event.stopImmediatePropagation()
-      toggleConnection()
+      toggleConnection(target.closest('[data-connection-toggle]').dataset.connection)
       return
     }
     if (!offline()) return
     const link = target?.closest('a[href]')
+    if (link?.target === '_blank' && new URL(link.href, location.href).origin !== location.origin) return
     if (link?.getAttribute('href').startsWith('#')) return
     if (link) {
       event.preventDefault()
@@ -209,7 +223,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   }
   liveSocket.getSocket().onOpen(() => {
     everOpened = true
-    if (snapshotMode && !paused) {
+    if (!paused && (snapshotMode || (initiallyRouted && mainUnavailable()))) {
       location.assign(location.href)
       return
     }
@@ -223,7 +237,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   liveSocket.getSocket().onClose(connectionLost)
   liveSocket.getSocket().onError(connectionLost)
   new MutationObserver(refresh).observe(document.body, {
-    childList: true, subtree: true, attributes: true, attributeFilter: ['class'],
+    childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-phx-main', 'data-phx-session'],
   })
   cache.subscribe(refresh)
   refresh()

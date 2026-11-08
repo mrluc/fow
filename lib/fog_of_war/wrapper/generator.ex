@@ -9,29 +9,38 @@ defmodule FogOfWar.Wrapper.Generator do
     manifest = Manifest.read!(manifest_path, opts[:env])
     root = Path.dirname(Path.expand(manifest_path))
 
+    apple_desktop? = target == :elixirkit && is_binary(opts[:bundle_dir])
+
     {bundle_path, bundle, native_bundles, webview_path} =
-      if target == :mob do
-        native_root =
-          Path.expand(
-            opts[:bundle_dir] || ".fow/native/#{manifest["environment"] || "default"}",
-            root
-          )
+      cond do
+        target == :mob ->
+          native_root =
+            Path.expand(
+              opts[:bundle_dir] || ".fow/native/#{manifest["environment"] || "default"}",
+              root
+            )
 
-        native_bundles = read_native_bundles!(native_root, manifest)
-        {dependency, path} = webview_dependency!(manifest, root, opts)
-        {native_root, nil, native_bundles, {dependency, path}}
-      else
-        bundle_path = Path.expand(manifest["public"]["bundle"], root)
-        bundle = Path.join(bundle_path, "bundle.json") |> File.read!() |> Jason.decode!()
+          native_bundles = read_native_bundles!(native_root, manifest)
+          {dependency, path} = webview_dependency!(manifest, root, opts)
+          {native_root, nil, native_bundles, {dependency, path}}
 
-        unless bundle["scope"] == "public" && bundle["origin"] == manifest["web"]["origin"] &&
-                 bundle["environment"] == manifest["environment"],
-               do:
-                 Mix.raise(
-                   "Export a public bundle matching the selected environment and web.origin first"
-                 )
+        apple_desktop? ->
+          source = Path.expand(opts[:bundle_dir], root)
+          native = read_native_bundle!(source, "apple", manifest)
+          {source, nil, [{"apple", source, native}], nil}
 
-        {bundle_path, bundle, [], nil}
+        true ->
+          bundle_path = Path.expand(manifest["public"]["bundle"], root)
+          bundle = Path.join(bundle_path, "bundle.json") |> File.read!() |> Jason.decode!()
+
+          unless bundle["scope"] == "public" && bundle["origin"] == manifest["web"]["origin"] &&
+                   bundle["environment"] == manifest["environment"],
+                 do:
+                   Mix.raise(
+                     "Export a public bundle matching the selected environment and web.origin first"
+                   )
+
+          {bundle_path, bundle, [], nil}
       end
 
     {webview_dependency, webview_protected} = webview_path || {nil, nil}
@@ -51,7 +60,14 @@ defmodule FogOfWar.Wrapper.Generator do
       height: get_in(manifest, ["elixirkit", "height"]) || 760,
       webview_dependency: webview_dependency,
       mobile_platforms: get_in(manifest, ["mob", "platforms"]) || ["android", "ios"],
-      desktop_startup: get_in(manifest, ["elixirkit", "startup"]) || "bundled"
+      desktop_startup: get_in(manifest, ["elixirkit", "startup"]) || "bundled",
+      apple_desktop: apple_desktop?,
+      native_files:
+        for(
+          {_, _, native} <- native_bundles,
+          {url, entry} <- Enum.sort(native["files"]),
+          do: {Jason.encode!(url), Jason.encode!(entry["file"]), Jason.encode!(entry["mime"])}
+        )
     ]
 
     Output.replace!(
@@ -70,9 +86,14 @@ defmodule FogOfWar.Wrapper.Generator do
                   native
                 )
         else
-          copy_bundle!(bundle_path, Path.join(stage, "priv/fog_of_war"))
-          put!(stage, "priv/fog_of_war_seed.js", Export.seed_script(bundle))
-          put!(stage, "lib/#{app}/public_shell.ex", template("public_shell.ex.eex", assigns))
+          if apple_desktop? do
+            [{"apple", source, native}] = native_bundles
+            copy_native_bundle!(source, Path.join(stage, "priv/fog_of_war/apple"), native)
+          else
+            copy_bundle!(bundle_path, Path.join(stage, "priv/fog_of_war"))
+            put!(stage, "priv/fog_of_war_seed.js", Export.seed_script(bundle))
+            put!(stage, "lib/#{app}/public_shell.ex", template("public_shell.ex.eex", assigns))
+          end
         end
 
         Manifest.write!(Path.join(stage, ".fow.json"), manifest)
@@ -163,22 +184,26 @@ defmodule FogOfWar.Wrapper.Generator do
             "Prepare the #{platform} bundle first: mix fow.bundle.prepare --platform #{platform} (or pass --bundle-dir)"
           )
 
-      native = source |> Path.join("native.json") |> File.read!() |> Jason.decode!()
-      index = source |> Path.join("index.json") |> File.read!() |> Jason.decode!()
-
-      unless native["schema"] == 1 && native["platform"] == platform &&
-               native["url"] == manifest["web"]["origin"] <> manifest["web"]["start_path"] &&
-               index["scope"] == "public" && index["origin"] == manifest["web"]["origin"] &&
-               index["environment"] == manifest["environment"] &&
-               Enum.sort(Map.keys(index["pages"])) ==
-                 Enum.sort(Enum.uniq(manifest["public"]["paths"])),
-             do:
-               Mix.raise(
-                 "Native #{platform} bundle must match the selected environment, origin and public paths"
-               )
-
-      {platform, source, native}
+      {platform, source, read_native_bundle!(source, platform, manifest)}
     end
+  end
+
+  defp read_native_bundle!(source, platform, manifest) do
+    native = source |> Path.join("native.json") |> File.read!() |> Jason.decode!()
+    index = source |> Path.join("index.json") |> File.read!() |> Jason.decode!()
+
+    unless native["schema"] == 1 && native["platform"] == platform &&
+             native["url"] == manifest["web"]["origin"] <> manifest["web"]["start_path"] &&
+             index["scope"] == "public" && index["origin"] == manifest["web"]["origin"] &&
+             index["environment"] == manifest["environment"] &&
+             Enum.sort(Map.keys(index["pages"])) ==
+               Enum.sort(Enum.uniq(manifest["public"]["paths"])),
+           do:
+             Mix.raise(
+               "Native #{platform} bundle must match the selected environment, origin and public paths"
+             )
+
+    native
   end
 
   defp copy_native_bundle!(source, target, native) do
@@ -229,22 +254,26 @@ defmodule FogOfWar.Wrapper.Generator do
   defp mixfile(target, a) do
     # Mob's blank native scaffold links SQLite, so retain its source dependency.
     platform =
-      if target == :mob do
-        "#{a[:webview_dependency]}, {:mob, \"== 0.9.27\"}, {:ecto_sqlite3, \"~> 0.18\"}, {:mob_dev, \"~> 0.7.31\", only: :dev, runtime: false}"
+      if a[:apple_desktop] do
+        ""
       else
-        "{:elixirkit, github: \"livebook-dev/elixirkit\", ref: \"#{@elixirkit_ref}\"}"
+        if target == :mob do
+          "#{a[:webview_dependency]}, {:mob, \"== 0.9.27\"}, {:ecto_sqlite3, \"~> 0.18\"}, {:mob_dev, \"~> 0.7.31\", only: :dev, runtime: false}"
+        else
+          "{:elixirkit, github: \"livebook-dev/elixirkit\", ref: \"#{@elixirkit_ref}\"}"
+        end
       end
 
     erlang =
       if target == :mob, do: ", erlc_paths: [\"src\"], erlc_options: [:debug_info]", else: ""
 
     application =
-      if target == :mob,
+      if target == :mob || a[:apple_desktop],
         do: "[extra_applications: [:logger]]",
         else: "[mod: {#{a[:module]}.Application, []}, extra_applications: [:logger]]"
 
     release =
-      if target == :elixirkit,
+      if target == :elixirkit && !a[:apple_desktop],
         do:
           ", releases: [#{a[:app]}: [steps: [:assemble, &ElixirKit.Release.codesign/1], entitlements: \"src-tauri/App.entitlements\"]]",
         else: ""
@@ -385,9 +414,29 @@ defmodule FogOfWar.Wrapper.Generator do
     icon = File.read!(Application.app_dir(:fow, "priv/templates/wrapper/fallback.png"))
     put!(stage, "branding/fallback.png", icon)
     put!(stage, "src-tauri/icons/icon.png", icon)
-    put!(stage, "lib/#{a[:app]}/application.ex", template("desktop_application.ex.eex", a))
-    put!(stage, "src-tauri/src/main.rs", template("desktop_main.rs.eex", a))
-    put!(stage, "src-tauri/build.rs", "fn main() { tauri_build::build() }\n")
+
+    if a[:apple_desktop] do
+      put!(stage, "src-tauri/src/main.rs", template("desktop_apple_main.rs.eex", a))
+      put!(stage, "src-tauri/src/desktop_bundle.rs", template("desktop_bundle.rs.eex", a))
+    else
+      put!(stage, "lib/#{a[:app]}/application.ex", template("desktop_application.ex.eex", a))
+      put!(stage, "src-tauri/src/main.rs", template("desktop_main.rs.eex", a))
+    end
+
+    build_script =
+      if a[:apple_desktop] do
+        """
+        fn main() {
+            let commands = tauri_build::AppManifest::new().commands(&["read_fow_bundle_asset"]);
+            tauri_build::try_build(tauri_build::Attributes::new().app_manifest(commands))
+                .expect("generate desktop capabilities");
+        }
+        """
+      else
+        "fn main() { tauri_build::build() }\n"
+      end
+
+    put!(stage, "src-tauri/build.rs", build_script)
 
     put!(stage, "src-tauri/Cargo.toml", """
     [package]
@@ -398,21 +447,37 @@ defmodule FogOfWar.Wrapper.Generator do
     tauri-build = { version = "=2.7.4", features = [] }
     [dependencies]
     tauri = { version = "=2.12.5", features = [] }
-    elixirkit = { path = "../deps/elixirkit/elixirkit_rs" }
+    #{if a[:apple_desktop], do: ~s|objc2 = "=0.6.5"\nobjc2-foundation = { version = "=0.3.2", default-features = false }\nobjc2-web-kit = { version = "=0.3.2", default-features = false, features = ["WKWebView", "WKNavigation"] }|, else: ~s|elixirkit = { path = "../deps/elixirkit/elixirkit_rs" }|}
     [features]
     custom-protocol = ["tauri/custom-protocol"]
     """)
+
+    capabilities =
+      if a[:apple_desktop] do
+        [
+          %{
+            "identifier" => "fow-public-bundle",
+            "local" => false,
+            "remote" => %{"urls" => [a[:origin] <> "/*"]},
+            "windows" => ["main"],
+            "permissions" => ["allow-read-fow-bundle-asset"]
+          }
+        ]
+      else
+        []
+      end
 
     config = %{
       "$schema" => "https://schema.tauri.app/config/2",
       "productName" => a[:name],
       "version" => manifest["app"]["version"],
       "identifier" => manifest["app"]["identifier"],
-      "app" => %{"windows" => [], "security" => %{"capabilities" => []}},
+      "app" => %{"windows" => [], "security" => %{"capabilities" => capabilities}},
       "bundle" => %{
         "active" => true,
         "targets" => ["app"],
-        "resources" => %{"target/rel" => "rel"},
+        "resources" => if(a[:apple_desktop], do: %{}, else: %{"target/rel" => "rel"}),
+        "macOS" => %{"minimumSystemVersion" => if(a[:apple_desktop], do: "12.0", else: "10.13")},
         "icon" => ["icons/icon.icns", "icons/icon.png"]
       }
     }
@@ -433,8 +498,7 @@ defmodule FogOfWar.Wrapper.Generator do
     set -euo pipefail
     cd "$(dirname "$0")"
     if [ "$(uname -s)" != Darwin ]; then echo "This first release recipe requires macOS." >&2; exit 1; fi
-    mix deps.get
-    MIX_ENV=prod mix release #{a[:app]} --overwrite --path src-tauri/target/rel
+    #{if !a[:apple_desktop], do: "mix deps.get\nMIX_ENV=prod mix release #{a[:app]} --overwrite --path src-tauri/target/rel"}
     icons=(branding/source.*)
     if [ ! -f "${icons[0]}" ]; then icons=(branding/fallback.png); fi
     if [ -f "${CLIENT_TAURI_JS:-}" ]; then
@@ -488,6 +552,22 @@ defmodule FogOfWar.Wrapper.Generator do
   end
 
   defp readme(:elixirkit, a) do
+    if a[:apple_desktop] do
+      """
+      # #{a[:name]} — macOS WebKit wrapper
+
+      Run `bash build.sh` on macOS with Rust, Tauri CLI, and Xcode command-line tools.
+      Open `#{a[:name]}.app` in the Cargo target's `release/bundle/macos` directory.
+      The app opens the embedded startup document at #{a[:live]} and reads the
+      bundled public snapshots through a native command. Online navigation uses
+      the configured website. Regenerate this project to refresh the embedded bundle.
+      """
+    else
+      legacy_desktop_readme(a)
+    end
+  end
+
+  defp legacy_desktop_readme(a) do
     """
     # #{a[:name]} — elixirkit wrapper
 

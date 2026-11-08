@@ -1,6 +1,6 @@
 defmodule FogOfWar.Wrapper.Workflow do
   @moduledoc "Build and local installation steps for generated desktop projects."
-  alias FogOfWar.Wrapper.{Export, Generator, Manifest, Output}
+  alias FogOfWar.Wrapper.{Generator, Manifest, NativeBundle, Output}
 
   def project_path(manifest_path, target, opts \\ []) do
     manifest = Manifest.read!(manifest_path, opts[:env])
@@ -68,7 +68,7 @@ defmodule FogOfWar.Wrapper.Workflow do
     manifest_path = Path.expand(manifest_path)
     manifest = Manifest.read!(manifest_path, opts[:env])
     root = Path.dirname(manifest_path)
-    bundle = Path.expand(manifest["public"]["bundle"], root)
+    bundle = Path.join([root, ".fow/native", manifest["environment"] || "default", "apple"])
     project = project_path(manifest_path, :elixirkit, opts)
     # Reject unsafe outputs before fetching pages or running a build.
     Output.validate!(project, [root, bundle])
@@ -79,12 +79,21 @@ defmodule FogOfWar.Wrapper.Workflow do
     end
 
     Output.replace!(bundle, [force: opts[:force], protected: [root, project]], fn stage ->
-      # The exporter owns its own staging directory and requires a fresh output.
+      # NativeBundle owns its staging directory and requires a fresh output.
       File.rmdir!(stage)
-      Export.run!(manifest, root, stage, base_url: opts[:base_url], fetch: opts[:fetch])
+
+      NativeBundle.run!(manifest, root, stage, "apple",
+        base_url: opts[:base_url],
+        fetch: opts[:fetch]
+      )
     end)
 
-    Generator.run!(:elixirkit, manifest_path, project, env: opts[:env], force: opts[:force])
+    Generator.run!(:elixirkit, manifest_path, project,
+      bundle_dir: bundle,
+      env: opts[:env],
+      force: opts[:force]
+    )
+
     project |> build_elixirkit!(opts) |> install_osx_local!(opts)
   end
 

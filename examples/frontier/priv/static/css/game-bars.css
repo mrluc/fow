@@ -1,0 +1,33 @@
+.frontier-bars {
+  position: fixed;
+  left: 16px;
+  bottom: 48px;
+  width: min(420px, calc(100vw - 32px));
+  z-index: 6;
+  display: grid;
+  gap: 7px;
+  color: #e9e2d1;
+}
+.frontier-bars label {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.frontier-bars progress {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  border: 1px solid #ffffff28;
+  border-radius: 2px;
+  background: #10140ddd;
+  overflow: hidden;
+}
+.frontier-bars .move-bar { --bar-color: #e59a46; }
+.frontier-bars .health-bar { --bar-color: #b282d0; }
+.frontier-bars .connection-bar { --bar-color: #babdb8; }
+.frontier-bars progress::-webkit-progress-bar { background: #10140ddd; }
+.frontier-bars progress::-webkit-progress-value { background: var(--bar-color); }
+.frontier-bars progress::-moz-progress-bar { background: var(--bar-color); }

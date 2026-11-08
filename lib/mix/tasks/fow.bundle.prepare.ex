@@ -18,7 +18,8 @@ defmodule Mix.Tasks.Fow.Bundle.Prepare do
 
     if rest != [] || invalid != [], do: Mix.raise("Invalid bundle arguments")
     platform = opts[:platform] || "android"
-    unless platform in ["android", "ios"], do: Mix.raise("--platform must be android or ios")
+    unless platform in ["android", "ios", "apple"],
+      do: Mix.raise("--platform must be android, ios or apple")
     path = Path.expand(opts[:manifest] || ".fow.json")
     manifest = FogOfWar.Wrapper.Manifest.read!(path, opts[:env])
     project = Path.dirname(path)

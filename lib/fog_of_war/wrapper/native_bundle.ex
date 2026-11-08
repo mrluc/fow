@@ -1,8 +1,9 @@
 defmodule FogOfWar.Wrapper.NativeBundle do
   @moduledoc "Prepares executable public startup HTML and allowlisted native assets."
-  alias FogOfWar.Wrapper.{CacheExport, Export}
+  alias FogOfWar.Wrapper.{CacheExport, Export, InlineAssets}
 
-  def run!(manifest, project, output, platform, opts \\ []) when platform in ["android", "ios"] do
+  def run!(manifest, project, output, platform, opts \\ [])
+      when platform in ["android", "ios", "apple"] do
     if File.exists?(output), do: Mix.raise("Native bundle destination exists: #{output}")
     stage = output <> ".tmp-#{System.unique_integer([:positive])}"
 
@@ -22,15 +23,20 @@ defmodule FogOfWar.Wrapper.NativeBundle do
 
       assets = Export.copy_assets!(references, project, manifest, stage, %{})
       origin = index["origin"]
+      apple_scheme? = platform in ["ios", "apple"]
+      startup = File.read!(Path.join(stage, "startup.html"))
+
+      startup =
+        if apple_scheme?, do: InlineAssets.inline(startup, assets, origin, stage), else: startup
 
       asset_url = fn path ->
-        if platform == "ios", do: "fog-of-war-assets://bundle" <> path, else: origin <> path
+        if apple_scheme?, do: "fog-of-war-assets://bundle" <> path, else: origin <> path
       end
 
       # Rewrite parsed URL attributes only. Navigation hrefs and LiveView tokens stay intact.
       rewrite = fn html -> rewrite_html(html, assets, origin, asset_url) end
 
-      if platform == "ios" do
+      if apple_scheme? do
         for {path, file} <- assets, Path.extname(path) == ".css" do
           target = Path.join(stage, file)
           css = File.read!(target)
@@ -75,7 +81,7 @@ defmodule FogOfWar.Wrapper.NativeBundle do
       File.write!(Path.join(stage, "index.json"), Jason.encode!(index))
 
       prefix =
-        if platform == "ios",
+        if apple_scheme?,
           do: "fog-of-war-assets://bundle/__fog_of_war_bundle/",
           else: origin <> "/__fog_of_war_bundle/"
 
@@ -84,19 +90,25 @@ defmodule FogOfWar.Wrapper.NativeBundle do
         assets: Map.new(assets, fn {path, _} -> {path, asset_url.(path)} end)
       }
 
-      File.write!(
-        Path.join(stage, "boot.js"),
-        "window.__fogOfWarNativeBundle=" <> Jason.encode!(boot) <> ";"
-      )
+      boot_script =
+        "window.__fogOfWarNativeBundle=" <>
+          String.replace(Jason.encode!(boot), "<", "\\u003c") <> ";"
 
-      html = File.read!(Path.join(stage, "startup.html")) |> rewrite.()
+      boot_tag =
+        if apple_scheme? do
+          {"script", [], [boot_script]}
+        else
+          File.write!(Path.join(stage, "boot.js"), boot_script)
+          {"script", [{"src", prefix <> "boot.js"}], []}
+        end
 
       html =
-        html
+        startup
+        |> rewrite.()
         |> Floki.parse_document!()
         |> Floki.traverse_and_update(fn
           {"head", attrs, children} ->
-            {"head", attrs, [{"script", [{"src", prefix <> "boot.js"}], []} | children]}
+            {"head", attrs, [boot_tag | children]}
 
           other ->
             other
@@ -110,9 +122,16 @@ defmodule FogOfWar.Wrapper.NativeBundle do
           {asset_url.(path), %{"file" => file, "mime" => MIME.from_path(path)}}
         end)
 
+      metadata_files = [{"index.json", "application/json"}]
+
+      metadata_files =
+        if apple_scheme?,
+          do: metadata_files,
+          else: [{"boot.js", "text/javascript"} | metadata_files]
+
       files =
         Enum.reduce(
-          [{"index.json", "application/json"}, {"boot.js", "text/javascript"}] ++
+          metadata_files ++
             Enum.map(pages, fn {_, p} -> {p["file"], "application/octet-stream"} end),
           files,
           fn {file, mime}, acc ->

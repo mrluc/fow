@@ -11,7 +11,10 @@ export function installFogOfWar(liveSocket, options = {}) {
   liveSocket.hooks.FogOfWarDevTools = createDevToolsHook(coordinator)
   const bundle = window.__fogOfWarNativeBundle
   if (bundle) {
-    window.fogOfWarStartup = coordinator.cache.importBundle(bundle.indexURL).then(result => {
+    const readAsset = window.__fogOfWarNativeReadAsset
+    window.fogOfWarStartup = coordinator.cache.importBundle(bundle.indexURL, {
+      ...(typeof readAsset === 'function' ? {readAsset: (path, options) => readAsset(path, options)} : {}),
+    }).then(result => {
       window.dispatchEvent(new CustomEvent('fog-of-war:snapshot', {detail: {source: 'bundle'}}))
       return result
     }).catch(error => { console.error('[FogOfWar] Native bundle import failed', error); throw error })

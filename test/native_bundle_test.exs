@@ -54,14 +54,20 @@ defmodule FogOfWar.NativeBundleTest do
     end
   end
 
-  test "iOS rewrites only asset URLs, including CSS and compressed records; origin and navigation remain real",
+  test "iOS inlines startup code, rewrites image URLs and preserves live navigation",
        ctx do
     root = Path.join(ctx.root, "ios")
     native = NativeBundle.run!(ctx.manifest, ctx.root, root, "ios", fetch: ctx.fetch)
     assert native["url"] == "https://example.com/"
     assert native["files"]["fog-of-war-assets://bundle/assets/tree.png"]
     html = File.read!(Path.join(root, "startup.html"))
-    assert html =~ "fog-of-war-assets://bundle/assets/app.js"
+    assert html =~ "window.applicationRuns = true"
+    assert html =~ "window.__fogOfWarNativeBundle="
+    assert html =~ "<style>.ground{color:green}"
+    assert html =~ "background:url('fog-of-war-assets://bundle/assets/tree.png')"
+    refute html =~ ~r/<script\b[^>]*\bsrc=/
+    refute html =~ ~s(rel="stylesheet")
+    refute File.exists?(Path.join(root, "boot.js"))
     assert html =~ ~s(href="/two")
     css = File.read!(Path.join(root, "assets/assets/app.css"))
     assert css =~ "fog-of-war-assets://bundle/assets/terrain.css"
@@ -73,5 +79,49 @@ defmodule FogOfWar.NativeBundleTest do
     assert byte_size(bytes) == record["compressedBytes"]
     assert Base.encode16(:crypto.hash(:sha256, bytes), case: :lower) == record["sha256"]
     assert :zlib.gunzip(bytes) =~ "fog-of-war-assets://bundle/assets/tree.png"
+  end
+
+  test "Apple target matches the existing iOS scheme, startup, assets and gzip payloads", ctx do
+    ios_root = Path.join(ctx.root, "ios")
+    apple_root = Path.join(ctx.root, "apple")
+    ios = NativeBundle.run!(ctx.manifest, ctx.root, ios_root, "ios", fetch: ctx.fetch)
+    apple = NativeBundle.run!(ctx.manifest, ctx.root, apple_root, "apple", fetch: ctx.fetch)
+
+    assert ios["platform"] == "ios"
+    assert apple["platform"] == "apple"
+    assert apple["url"] == "https://example.com/"
+    assert ios["url"] == apple["url"]
+    assert Enum.sort(Map.keys(apple["files"])) == Enum.sort(Map.keys(ios["files"]))
+
+    assert File.read!(Path.join(apple_root, "startup.html")) ==
+             File.read!(Path.join(ios_root, "startup.html"))
+
+    for file <- ["assets/assets/app.css", "assets/assets/terrain.css"] do
+      assert File.read!(Path.join(apple_root, file)) == File.read!(Path.join(ios_root, file))
+    end
+
+    apple_index = File.read!(Path.join(apple_root, "index.json")) |> Jason.decode!()
+    ios_index = File.read!(Path.join(ios_root, "index.json")) |> Jason.decode!()
+    assert apple_index["origin"] == "https://example.com"
+    assert apple_index["origin"] == ios_index["origin"]
+
+    assert Enum.sort(Map.keys(apple_index["pages"])) ==
+             Enum.sort(Map.keys(ios_index["pages"]))
+
+    for {path, apple_record} <- apple_index["pages"] do
+      ios_record = ios_index["pages"][path]
+      apple_bytes = File.read!(Path.join(apple_root, apple_record["file"]))
+      ios_bytes = File.read!(Path.join(ios_root, ios_record["file"]))
+      apple_html = :zlib.gunzip(apple_bytes)
+      ios_html = :zlib.gunzip(ios_bytes)
+
+      assert apple_html == ios_html
+      assert apple_html =~ "fog-of-war-assets://bundle/assets/tree.png"
+      assert apple_html =~ ~s(href="/two")
+      assert byte_size(apple_bytes) == apple_record["compressedBytes"]
+
+      assert Base.encode16(:crypto.hash(:sha256, apple_bytes), case: :lower) ==
+               apple_record["sha256"]
+    end
   end
 end

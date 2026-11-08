@@ -1,0 +1,38 @@
+.game-debug { padding: 12px; max-width: 1600px; margin: auto; }
+.game-debug header { position: static; }
+.game-debug h1 { font-size: 20px; }
+.debug-columns { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr); gap: 24px; }
+.debug-map { position: relative; height: 480px; overflow: hidden; container-type: inline-size; background: radial-gradient(ellipse, #293522, transparent 75%); }
+.debug-scene { --map-scale: .75; margin-top: -210px; }
+.debug-map .floor, .debug-map .tree { filter: none !important; }
+.debug-map .tile-target { padding: 0; border: 0; background: transparent; }
+.debug-map .tile-target:hover { background: #ffe6a126; }
+.debug-map-labels { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.debug-map-label {
+  position: absolute; width: 90px; margin-left: -45px; margin-top: -7px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+}
+.debug-map-label small { color: #e1dec6; font-size: 10px; }
+.debug-player-count { color: #9fff91; font-weight: bold; font-size: 16px; }
+.debug-monster { display: inline-block; width: 10px; height: 10px; border: 1px solid #4c0c06; border-radius: 50%; background: #ff4a42; box-shadow: 0 0 3px #000; }
+.game-debug pre { overflow: auto; padding: 10px; background: #10160e; border: 1px solid #46563a; }
+.game-debug pre.selected { border-color: #e9c56a; }
+.game-debug button { color: inherit; }
+#debug-players button { background: transparent; border: 0; text-decoration: underline; cursor: pointer; }
+@media(max-width: 850px) { .debug-columns { grid-template-columns: 1fr; } }
+@media(max-width: 480px) { .game-debug { padding: 12px; } .debug-scene { --map-scale: .6; } .debug-map { height: 330px; } }
+
+@container (min-width: 480px) { .debug-scene { --map-scale: .85; } }
+@container (min-width: 540px) { .debug-scene { --map-scale: .95; } }
+@container (min-width: 600px) { .debug-scene { --map-scale: 1.05; } }
+@container (min-width: 660px) { .debug-scene { --map-scale: 1.15; } }
+@container (min-width: 720px) { .debug-scene { --map-scale: 1.25; } }
+
+/* Share the actual terrain and entity sprites, without player exploration masks. */
+.debug-entities { z-index: 6; }
+.debug-entity { pointer-events: auto; border: 0; padding: 0; background-color: transparent; cursor: pointer; }
+.debug-entity:hover, .debug-entity:focus-visible { outline: 1px solid #ddbf72; outline-offset: 2px; }
+.debug-entity.debug-dead { filter: grayscale(1); opacity: .4; }
+.game-debug[data-paused="true"] .entity-sprite { animation-play-state: paused; }
+#pause-game[aria-pressed="true"] { color: #ddbf72; }

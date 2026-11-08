@@ -163,12 +163,13 @@ function mountDevTools(el, coordinator) {
   const unsubscribeStatus=coordinator.subscribe(status=>{
     tools.dataset.connection=status.connection
     tools.dataset.socket=status.socketConnected?'connected':'closed'
-    get('[data-state]').textContent=status.socketConnected?'Live':'Disconnected'
+    const connected=status.socketConnected&&status.connection==='live'
+    get('[data-state]').textContent=connected?'Live':'Disconnected'
     get('[data-state]').title=status.text
     const connection=get('[data-action="connection"]')
-    connection.dataset.paused=String(status.connection==='paused')
-    connection.setAttribute('aria-label',status.connection==='paused'?'Reconnect':'Disconnect socket')
-    get('[data-action="connection"]').title=status.connection==='paused'?'Reconnect; cached browsing reloads the current route.':'Disconnect socket'
+    connection.dataset.paused=String(!connected)
+    connection.setAttribute('aria-label',!connected?'Reconnect':'Disconnect socket')
+    get('[data-action="connection"]').title=!connected?'Reconnect; cached browsing reloads the current route.':'Disconnect socket'
     get('[data-message]').textContent=status.message||(status.snapshotMode?'Read-only cached HTML · reconnect loads the current route.':'Navigation events stay in memory in this document.')
     get('[data-message]').title=get('[data-message]').textContent
   })

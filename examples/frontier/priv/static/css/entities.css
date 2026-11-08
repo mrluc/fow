@@ -1,0 +1,58 @@
+.entity-layer { position: absolute; width: 0; height: 0; z-index: 3; pointer-events: none; }
+.entity-slot { position: absolute; left: 0; top: 0; }
+.entity-slot:nth-child(6n+1) { transform: translate(-25px, 5px); }
+.entity-slot:nth-child(6n+2) { transform: translate(25px, -7px); }
+.entity-slot:nth-child(6n+3) { transform: translate(-8px, -20px); }
+.entity-slot:nth-child(6n+4) { transform: translate(8px, 15px); }
+.entity-slot:nth-child(6n+5) { transform: translate(-38px, -10px); }
+.entity-slot:nth-child(6n+6) { transform: translate(38px, 10px); }
+.entity-sprite {
+  display: block; position: absolute; width: 52px; height: 58px; left: -26px; bottom: 0;
+  background-position: center bottom; background-size: contain; background-repeat: no-repeat;
+  filter: drop-shadow(2px 3px 2px #0006);
+}
+.entity-player { background-image: url('/images/scout/256/scout-idle.png'); }
+.entity-monster {
+  width: 128px; height: 128px; left: -64px; bottom: -12px;
+  background-image: url('/images/monster/256/monster-idle.png');
+  animation: monster-stride 160ms steps(1, end) 4;
+}
+@keyframes monster-stride {
+  0%, 100% { background-image: url('/images/monster/256/monster-idle.png'); }
+  50% { background-image: url('/images/monster/256/monster-walk.png'); }
+}
+.fow-offline .entity-sprite { filter: saturate(.45) brightness(.55) drop-shadow(2px 3px 2px #0006); }
+.fow-offline .entity-monster { animation: none; }
+@media (prefers-reduced-motion: reduce) { .entity-monster { animation: none; } }
+
+.entity-monster.monster-exploding { animation: monster-explode 3s steps(1, end) infinite; }
+@keyframes monster-explode {
+  0% { background-image: url('/images/monster/256/monster-explosion-anchored-head.png'); }
+  20% { background-image: url('/images/monster/256/monster-spread-starfish.png'); }
+  40% { background-image: url('/images/monster/256/monster-recompose.png'); }
+  60%, 100% { background-image: url('/images/monster/256/monster-idle.png'); }
+}
+.fow-offline .entity-monster.monster-exploding { animation-play-state: paused; }
+.frontier-dead #player { opacity: .4; filter: grayscale(1) drop-shadow(1px 3px 1px #0006); transition: opacity .7s, filter .7s; }
+.frontier-dead .travel-layer { pointer-events: none; }
+.frontier-death {
+  position: fixed; z-index: 15; inset: 42% 12px auto; text-align: center;
+  pointer-events: none; color: #f0e7d5; text-shadow: 0 2px 8px #000;
+  font-family: 'Pirata One', serif;
+}
+.frontier-death[hidden] { display: none; }
+.frontier-death strong { display: block; font-size: clamp(2.5rem, 8vw, 5rem); }
+.frontier-death span { display: block; font-size: 1.3rem; }
+.lives-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.lives-row > span:first-child { width: 65px; }
+[data-lives-icons] { display: flex; flex-wrap: wrap; gap: 1px; }
+[data-lives-icons] img, .life-scout { width: 20px; height: 26px; object-fit: contain; }
+.life-scout { display: inline-block; background: url('/images/scout/256/scout-idle.png') center / contain no-repeat; }
+.life-spent { filter: grayscale(1); opacity: .3; }
+.life-debt { background: #e34545; mask: url('/images/scout/256/scout-idle.png') center / contain no-repeat; }
+@media (prefers-reduced-motion: reduce) {
+  .entity-monster.monster-exploding { animation: none; }
+  .frontier-dead #player { transition: none; }
+}
+
+.frontier-paused .entity-sprite { animation-play-state: paused; }

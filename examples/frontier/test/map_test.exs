@@ -4,7 +4,14 @@ defmodule FogOfWarFrontier.MapTest do
   import Phoenix.LiveViewTest
   @endpoint FogOfWarFrontierWeb.Endpoint
   test "4 by 4 map, nine terrain tiles per location, corner start and adjacent travel" do
-    {:ok, view, _} = live(build_conn(), "/lat/0/lon/0")
+    {:ok, view, _} =
+      live(
+        Plug.Conn.put_private(build_conn(), :live_view_connect_info, %{
+          session: %{"frontier_player_id" => "map-test-player"}
+        }),
+        "/lat/0/lon/0"
+      )
+
     assert has_element?(view, "#player.at-0-0")
     refute has_element?(view, "header, aside, footer, h1, h2")
 
@@ -26,7 +33,12 @@ defmodule FogOfWarFrontier.MapTest do
       view
       |> element(".tile-target[href='/lat/1/lon/1']")
       |> render_click()
-      |> follow_redirect(build_conn(), "/lat/1/lon/1")
+      |> follow_redirect(
+        Plug.Conn.put_private(build_conn(), :live_view_connect_info, %{
+          session: %{"frontier_player_id" => "map-test-player"}
+        }),
+        "/lat/1/lon/1"
+      )
 
     assert has_element?(next, "#player.at-1-1")
 
@@ -34,8 +46,8 @@ defmodule FogOfWarFrontier.MapTest do
              8
   end
 
-  test "root and invalid coordinates return to the starting corner" do
-    assert {:error, {:live_redirect, %{to: "/lat/0/lon/0"}}} = live(build_conn(), "/")
+  test "root opens multiplayer; invalid legacy coordinates return to the starting corner" do
+    assert {:error, {:live_redirect, %{to: "/multi/lat/0/lon/0"}}} = live(build_conn(), "/")
     assert {:error, {:live_redirect, %{to: "/lat/0/lon/0"}}} = live(build_conn(), "/lat/8/lon/8")
   end
 end

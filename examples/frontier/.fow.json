@@ -9,6 +9,37 @@
           "android"
         ]
       }
+    },
+    "multi-dev": {
+      "web": {
+        "start_path": "/multi/lat/0/lon/0"
+      },
+      "public": {
+        "paths": [
+          "/multi/lat/0/lon/0",
+          "/multi/lat/0/lon/1",
+          "/multi/lat/1/lon/0",
+          "/multi/lat/1/lon/1"
+        ]
+      }
+    },
+    "single-dev": {
+      "web": {
+        "start_path": "/lat/0/lon/0"
+      },
+      "public": {
+        "paths": [
+          "/lat/0/lon/0",
+          "/lat/0/lon/1",
+          "/lat/1/lon/0",
+          "/lat/1/lon/1"
+        ]
+      }
+    },
+    "prod": {
+      "web": {
+        "origin": "https://fow.fly.dev"
+      }
     }
   },
   "app": {
@@ -20,23 +51,24 @@
   },
   "web": {
     "origin": "http://127.0.0.1:47190",
-    "start_path": "/lat/0/lon/0",
+    "start_path": "/multi/lat/0/lon/0",
     "endpoint": "FogOfWarFrontierWeb.Endpoint",
     "router": "FogOfWarFrontierWeb.Router"
   },
   "public": {
     "paths": [
-      "/lat/0/lon/0",
-      "/lat/0/lon/1",
-      "/lat/1/lon/0",
-      "/lat/1/lon/1"
+      "/multi/lat/0/lon/0",
+      "/multi/lat/0/lon/1",
+      "/multi/lat/1/lon/0",
+      "/multi/lat/1/lon/1"
     ],
     "static_root": "priv/static",
     "bundle": ".fow/public",
     "asset_directories": [
       "assets",
       "css",
-      "images"
+      "images",
+      "fonts"
     ]
   },
   "elixirkit": {

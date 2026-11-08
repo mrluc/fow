@@ -1,0 +1,20 @@
+# Deploy from the repository root; Frontier depends on the parent FoW package.
+**/.git
+**/.fow
+**/_build
+**/deps
+**/node_modules
+**/target
+**/.gradle
+**/.zig-cache
+**/results
+**/test-results
+**/erl_crash.dump
+**/*.tar
+examples/wrappers
+examples/basic
+results
+test
+.git
+.agents
+.codex

@@ -1,5 +1,5 @@
 defmodule FogOfWarFrontierWeb do
-  def static_paths, do: ~w(assets css images favicon.ico robots.txt)
+  def static_paths, do: ~w(assets css images fonts favicon.ico robots.txt)
 
   def live_view do
     quote do

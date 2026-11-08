@@ -202,9 +202,8 @@ Official integration references: [Tauri initialization scripts](https://docs.rs/
 
 ## Checked in this workspace
 
-The source example is `examples/basic`, its manifest is `examples/basic/.fow.json`, and its exported bundle is `examples/basic/.fow/public`. Generated projects are `examples/wrappers/elixirkit` and `examples/wrappers/mob`. Use the shared workspace `elixir-client/env.sh` when reproducing with the installed tools/cache; generated projects themselves do not depend on that script.
+The source examples are `examples/basic` and `examples/frontier`. Generate native projects into their ignored `.fow/apps` directories using the Mix tasks described above.
 
-Validation: seven package tests, five Counter LiveView tests, four dev-tools browser tests and one Mob screen test pass. `test/browser/wrapper-smoke.cjs` verifies actual generated public-shell navigation/back, disabled actions, absence of signed session data, no external requests, document-start seeding, origin restriction and no overwrite of existing state. It runs with `PUBLIC_SHELL_URL` set to the generated host's printed readiness URL and the workspace Playwright installation in `NODE_PATH`. The screenshot is `results/wrapper-public-shell.png`.
 
 The generated macOS app is at `elixir-client/.cache/tauri-target/release/bundle/macos/Counters.app` when built using the shared workspace cache. Its window was inspected showing the bundled public Counter site. Android/iOS native execution of this new wrapper remains unverified; compilation and patch checks alone do not prove device behavior.
 
@@ -227,7 +226,6 @@ The output contains executable `startup.html`, metadata-only `index.json`, separ
 
 The separate `mob_webview` package accepts `bundle: MobWebView.Bundle.load!(root)` alongside `url: bundle["url"]`. Copy the prepared directory to the generated host's `priv` directory and resolve its on-device application path. Native code reads only declared files. The initial document is supplied once; later document navigations reach the website, allowing LiveView to renew stale bootstrap state. The existing gzip importer seeds IndexedDB in batches and preserves newer device captures. A small startup configuration is present in the HTML, not the region payloads.
 
-The existing ejected Android test host in `examples/wrappers/mob` now opens `CountersMobile.FrontierScreen` without native Live/Offline buttons or the legacy shell. Its historical application identifier stays unchanged so the installed ARM64 build can be reused. The Counter Phoenix example is unchanged. The general mobile generator now emits this same bundle API and seamless screen, with a bundle per selected platform.
 
 After preparing an Android bundle and copying it to that host's `priv/frontier`, deploy with Mob's existing native deployment command. Run the repeatable device test from the host:
 

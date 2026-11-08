@@ -1,5 +1,17 @@
 const hash = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(byte=>byte.toString(16).padStart(2,'0')).join('')
 const abortIfNeeded = signal => { if(signal?.aborted)throw new DOMException('Bundle import interrupted','AbortError') }
+const bytesFromHost = value => {
+  if(value instanceof Uint8Array)return value
+  if(value instanceof ArrayBuffer)return new Uint8Array(value)
+  if(ArrayBuffer.isView(value))return new Uint8Array(value.buffer,value.byteOffset,value.byteLength)
+  // Android and other JS bridges commonly return Base64 strings for binary data.
+  if(typeof value==='string'){
+    const binary=atob(value),bytes=new Uint8Array(binary.length)
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i)
+    return bytes
+  }
+  throw new TypeError('Host asset reader must return bytes or a Base64 string')
+}
 
 export async function importBundle(runtime,input,{baseURL,readAsset,batchSize=16,byteBudget=1024*1024,onProgress,signal}={}) {
   await runtime.ready
@@ -8,9 +20,16 @@ export async function importBundle(runtime,input,{baseURL,readAsset,batchSize=16
   let index=input
   if(typeof input==='string'||input instanceof URL){
     const url=new URL(input,location.href)
-    const response=await fetch(url,{credentials:'omit',signal})
-    if(!response.ok)throw new Error(`Bundle index: HTTP ${response.status}`)
-    index=await response.json();baseURL=new URL('.',url).href
+    baseURL=new URL('.',url).href
+    if(readAsset){
+      const payload=bytesFromHost(await readAsset('index.json',{signal}))
+      abortIfNeeded(signal)
+      index=JSON.parse(new TextDecoder().decode(payload))
+    } else {
+      const response=await fetch(url,{credentials:'omit',signal})
+      if(!response.ok)throw new Error(`Bundle index: HTTP ${response.status}`)
+      index=await response.json()
+    }
   }
   if(index?.schema!==1||index.format!=='fog-of-war-public-cache'||index.scope!=='public'||index.origin!==location.origin||!index.pages||typeof index.pages!=='object'||Array.isArray(index.pages))throw new Error('Bundle index does not match this origin or supported format')
   if(typeof DecompressionStream==='undefined')throw new Error('This browser cannot decompress bundled gzip records')
@@ -43,7 +62,7 @@ export async function importBundle(runtime,input,{baseURL,readAsset,batchSize=16
     abortIfNeeded(signal)
     if(!existing||existing.source==='bundle'&&Date.parse(existing.savedAt)<Date.parse(descriptor.savedAt)){
       let payload
-      if(readAsset){payload=await readAsset(descriptor.file,{signal});payload=payload instanceof Uint8Array?payload:new Uint8Array(payload)}
+      if(readAsset){payload=bytesFromHost(await readAsset(descriptor.file,{signal}))}
       else {
         const url=new URL(descriptor.file,baseURL)
         if(url.origin!==new URL(baseURL).origin)throw new Error('Bundle asset escaped its base origin')

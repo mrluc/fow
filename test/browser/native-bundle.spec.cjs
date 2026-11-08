@@ -17,8 +17,9 @@ test('native public bundle starts offline, imports gzip routes and automatically
   const output = path.join(root, 'bundle');
   let context;
   try {
-    execFileSync('mix', ['fow.bundle.prepare', '--manifest', manifestFile, '--output', output, '--platform', 'android'], {cwd: project, env: {...process.env, MIX_ENV:'test'}, stdio:'pipe'});
+    execFileSync('mix', ['fow.bundle.prepare', '--manifest', manifestFile, '--output', output, '--platform', 'android', '--env', 'single-dev'], {cwd: project, env: {...process.env, MIX_ENV:'test'}, stdio:'pipe'});
     const native = JSON.parse(fs.readFileSync(path.join(output, 'native.json')));
+    expect(native.files[origin + '/fonts/PirataOne-Regular.ttf']).toBeTruthy();
     // A fulfilled document has no local IP response metadata. Allow the local test server
     // explicitly; this is a Chrome test-harness permission, not a production setting.
     context = await browser.newContext({permissions:['local-network-access']});
@@ -40,6 +41,8 @@ test('native public bundle starts offline, imports gzip routes and automatically
     await expect.poll(() => page.evaluate(() => Boolean(window.fogOfWarStartup))).toBe(true);
     expect(await page.evaluate(() => window.fogOfWarStartup)).toMatchObject({complete:true,stored:4});
     await expect(page.locator('html')).toHaveClass(/fow-offline/);
+    expect(await page.evaluate(async () => (await document.fonts.load('20px "Pirata One"')).length)).toBe(1);
+    await expect(page.locator('#frontier-connection [data-label="connect"]')).toHaveText('Connect');
     const art = await page.evaluate(async () => Promise.all(['/images/fog-of-war-logo.png','/images/terrain.png','/images/pine.png','/images/scout-idle.png','/images/scout-walk.png'].map(src => new Promise((resolve,reject) => {
       const image = new Image(); image.crossOrigin = 'anonymous';
       image.onload = () => { try {

@@ -16,7 +16,7 @@ button[aria-busy="true"]::after { content:"…";margin-left:4px; }
 @media(hover:hover) { button:hover:not(:disabled),tr:hover { background:var(--color-line); } }
 .launcher { pointer-events:auto;display:flex;gap:7px;height:28px;margin-left:auto;border-radius:5px;background:var(--color-bg);box-shadow:0 2px 10px #0004; }
 .dot { flex-shrink:0;display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--color-muted); }
-.tools[data-socket="connected"] .dot { background:var(--color-good);animation:pulse 2s ease-in-out infinite; }
+.tools[data-connection="live"] .dot { background:var(--color-good);animation:pulse 2s ease-in-out infinite; }
 .tools[data-connection="paused"] .dot { background:var(--color-bad); }
 @keyframes pulse { 50% { box-shadow:0 0 0 3px #81c99525; } }
 .panel { position:relative;pointer-events:auto;display:flex;flex-direction:column;width:100%;height:calc(var(--dev-tools-height,250px) / var(--fog-of-war-dev-tools-scale,1));background:var(--color-bg);border:1px solid var(--color-line);border-radius:5px;overflow:hidden;box-shadow:0 3px 18px #0005; }

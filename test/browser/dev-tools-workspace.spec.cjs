@@ -30,7 +30,7 @@ test('unified timeline records denied and cached navigation in memory, filters a
   expect(stored.backend).toBe('indexedDB');
   expect(stored.keys).toEqual([]);
   await panel.locator('#help-tab').click();
-  await expect(panel.getByRole('heading',{name:'Why this fits LiveView'})).toBeVisible();
+  await expect(panel.getByRole('heading',{name:'LiveView is Great'})).toBeVisible();
   await expect(panel.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();
   await panel.getByRole('button',{name:'Reconnect',exact:true}).click();
   await expect(page.locator('#count')).toBeVisible();

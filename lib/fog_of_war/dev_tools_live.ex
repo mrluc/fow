@@ -79,8 +79,21 @@ defmodule FogOfWar.DevToolsLive do
                 <p style="zoom: 1.1;">
                   <a href="#liveview">LiveView is great.</a>
                   <a href="#offline">Offline is also great.</a>
-                  <a href="#fow">Fog of War is an approach to give us offline</a>
-                  that can work for a wide variety of apps, very easily.
+                  <a href="#fow">Fog of War is an approach to fairly easy offline</a>
+                  which can work for a wide variety of apps.
+                </p>
+
+                <h3 id="fow">Fog of War is offline support via simple caching</h3>
+
+                <p>
+                  Fog of War is an idiom from old Real-Time Strategy games.
+                  Like an explored part of a game map, it shows what was there
+                  the last time you looked! Specifically, if you're offline, it
+                  shows the last markup that the LiveView for that screen loaded with.
+                  Unvisited screens are still unavailable, but you can style links
+                  to them gracefully. And, you can even create a bundle of important
+                  screens to 'pre-explore' the map, which is useful for mobile, where
+                  the first experience might be an offline one.
                 </p>
 
                 <h2 id="liveview">LiveView is Great</h2>
@@ -119,14 +132,10 @@ defmodule FogOfWar.DevToolsLive do
                 <p>
                   If you care about the user experience, and especially if you
                   want to wrap it in a mobile app, you need to think about offline behavior.
-                  <a href="#fn1" class="fn">[1]</a>
-                </p>
-
-                <p id="fn1" class="fn-text">
-                  There are those who will say that, if you care about
+                  (There are those who will say that, if you care about
                   the user experience, you cannot possibly use web technologies
                   extensively in a mobile application. They are not usually saying it
-                  because they believe it to be strictly true, but for other reasons.
+                  because they believe it to be strictly true, but for other reasons).
                 </p>
 
                 <p>
@@ -138,25 +147,13 @@ defmodule FogOfWar.DevToolsLive do
                 </p>
 
                 <p>
-                  Similarly, some screens in an app really require being online.
-                  Performing a search for vacation rentals, for instance. But
+                  Sure, some screens in an app require being online.
+                  Showing a list of vacation rentals, for instance! But
                   much navigation should still be possible even when offline.
                   The creator of the app knows what screens make sense to
                   have cached and available for navigation locally, and which
-                  ones need to show a graceful offline indication.
+                  ones need to be grayed out, or show some other graceful offline indication.
                 </p>
-
-                <h3 id="fow">Fog of War is offline support via simple caching</h3>
-                <p>Fog of War remembers the pages you choose. Lose contact with the server and you can still visit those remembered pages. Like an explored part of a game map, they show what was there the last time you looked. Unvisited places stay unavailable.</p>
-                <h3>Why this fits LiveView</h3>
-                <p>The server already produces the screen. We save that HTML rather than build a second offline version of the app or copy its database into the browser. Add one hook to a page’s top-level content; keep using LiveView online.</p>
-                <h3>Remembered does not mean live</h3>
-                <p>Saved values can be old. Server actions are blocked offline and are not queued. Reconnecting after browsing cached pages loads fresh server state at the route you chose. This is read-only memory, not offline editing or background synchronization.</p>
-                <h3>Reading this tool</h3>
-                <p><strong>Cache</strong> shows one stored page per route. <strong>Nav</strong> shows attempts, live arrivals, cached visits and denied destinations. Events stay in memory in this document (up to 200); they are never written to persistent storage and disappear on a full reload. Newest records appear first. Click a column to change sorting.</p>
-                <p><strong>Vsn</strong> is the snapshot record format, currently 1. The separate <code>build</code> value in details is a renderer compatibility tag, not the package version. Compression is a storage encoding, not another app version.</p>
-                <p>Stored sizes count encoded payload and metadata bytes, excluding IndexedDB overhead. The localStorage fallback estimates UTF-16 keys and values. Clear unused preserves routes open in Fog of War tabs; it requires Web Locks. Pick content appropriate to remember on this device, and handle account changes and logout in your app.</p>
-                <p>Drag the header to dock at a corner or the top/bottom center. Corners use a compact, resizable panel; top and bottom centers span the window. Drag the divider to resize the list. The grip, divider and resize handle also accept arrow keys. Panel layout is remembered in sessionStorage, separately from the page cache.</p>
               </div>
             </section>
             <div class="resize-handle" role="separator" aria-label="Resize developer tools" tabindex="0"></div>

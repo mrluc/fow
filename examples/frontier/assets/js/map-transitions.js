@@ -5,6 +5,18 @@ export function createMapTransitions(refreshViewport = () => {}) {
   let current = location.pathname
   let queue = Promise.resolve()
   let active
+  let respawning = false
+  window.addEventListener('frontier:respawning', () => {
+    respawning = true
+    active?.skipTransition()
+    liveGeneration++
+    liveAnimations.forEach(animation => animation.cancel())
+    liveAnimations = []
+    document.getElementById('player')?.classList.remove('walking')
+  })
+  window.addEventListener('phx:frontier:player', ({detail}) => {
+    if (!detail.dead) respawning = false
+  })
   let liveAnimations = [], liveGeneration = 0
   const moveInPage = async update => {
     const beforePlayer = getComputedStyle(document.getElementById('player'))
@@ -45,8 +57,10 @@ export function createMapTransitions(refreshViewport = () => {}) {
     pending = null
     const changed = target !== current
     current = target
+    const teleport = respawning
     const run = () => {
-      if (!changed || !document.getElementById('player') || !document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (changed && !teleport) window.dispatchEvent(new Event("frontier:moved"))
+      if (teleport || !changed || !document.getElementById('player') || !document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const result = update()
         refreshViewport()
         return result

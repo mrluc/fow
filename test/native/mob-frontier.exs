@@ -1,5 +1,4 @@
 # Run from a generated Frontier Mob project after ./build.sh --android.
-# Also supports the older examples/wrappers/mob test host.
 # Clears only this throwaway host's WebView data, not its deployed Elixir/runtime files.
 
 # The generated screen intentionally has no QA handlers or event assigns. Trace
@@ -154,7 +153,6 @@ end
 {screen_module, view_id} =
   case Mix.Project.config()[:app] do
     :frontier_mobile -> {Module.concat(["FrontierMobile", "HomeScreen"]), :site}
-    :counters_mobile -> {Module.concat(["CountersMobile", "FrontierScreen"]), :frontier}
     app -> raise "Unsupported Mob test host #{inspect(app)}"
   end
 

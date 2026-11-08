@@ -18,7 +18,7 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
       return transition;
     };
   });
-  await page.goto('/');
+  await page.goto('/lat/0/lon/0');
   await expect(page).toHaveURL(/\/lat\/0\/lon\/0$/);
   await expect.poll(() => snapshotPaths(page)).toEqual(['/lat/0/lon/0','/lat/0/lon/1','/lat/1/lon/0','/lat/1/lon/1']);
   expect(await page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.filter(r => r.open).map(r => r.path))).toEqual(['/lat/0/lon/0']);
@@ -27,7 +27,7 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
   await expect(page.locator('.tile-target')).toHaveCount(3);
   await expect(page.locator('.ground-layer .at-1-1')).not.toHaveClass(/fow-nav-uncached/);
   await expect(page.locator('.ground-layer .at-3-3')).toHaveClass(/fow-nav-uncached/);
-  await expect(page.locator('canvas.pixel-fog')).toBeVisible();
+  await expect(page.locator('.sector.at-1-1 .floor')).toHaveCSS('filter', 'saturate(0.45) brightness(0.55)');
   // Transparent diamond hit areas sit over the whole terrain, with no visible labels or page chrome.
   await expect(page.locator('#frontier-map')).toHaveText('');
   expect(await page.locator('.tile-target').first().evaluate(el => getComputedStyle(el).clipPath)).toContain('polygon');
@@ -60,7 +60,7 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
 });
 
 
-test('map grows and stays centered while fog retains sharp one-pixel cells over terrain and trees', async ({page}) => {
+test('map grows and stays centered while CSS fog stays on remembered terrain and trees', async ({page}) => {
   await page.setViewportSize({width:900,height:800});
   await page.goto('/lat/0/lon/0');
   await expect.poll(() => snapshotPaths(page)).toHaveLength(4);
@@ -84,26 +84,9 @@ test('map grows and stays centered while fog retains sharp one-pixel cells over 
   expect(largeLogo.width).toBeCloseTo(await configuredLogoWidth(),0);
   const aspect=await page.locator('.game-logo').evaluate(el=>{const [w,h]=getComputedStyle(el).aspectRatio.split('/').map(Number);return w/h});
   expect(largeLogo.width/largeLogo.height).toBeCloseTo(aspect,1);
-  await expect.poll(()=>page.locator('canvas.pixel-fog').evaluate(el=>el.width)).toBe(1600);
-  const pixels=()=>page.evaluate(()=>{
-    const canvas=document.querySelector('canvas.pixel-fog'),ctx=canvas.getContext('2d');
-    const a=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-    let filled=0,invalid=0,wrongParity=0;
-    for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++){
-      const alpha=a[(y*canvas.width+x)*4+3];
-      if(alpha){filled++;if(alpha!==190)invalid++;if((x+y)%2)wrongParity++;}
-    }
-    const tree=document.querySelector('.object.at-1-1 .tree').getBoundingClientRect();
-    const floor=document.querySelector('.sector.at-1-1 .floor').getBoundingClientRect();
-    let crown=0;
-    for(let y=Math.max(0,Math.ceil(tree.top));y<Math.min(canvas.height,Math.floor(floor.top));y++)
-      for(let x=Math.max(0,Math.ceil(tree.left));x<Math.min(canvas.width,Math.floor(tree.right));x++)
-        if(a[(y*canvas.width+x)*4+3])crown++;
-    return {filled,invalid,wrongParity,crown};
-  });
-  await expect.poll(async()=> (await pixels()).crown).toBeGreaterThan(100);
-  const sample=await pixels();
-  expect(sample.filled).toBeGreaterThan(1000);expect(sample.invalid).toBe(0);expect(sample.wrongParity).toBe(0);
+  await expect(page.locator('.sector.at-1-1 .floor')).toHaveCSS('filter', 'saturate(0.45) brightness(0.55)');
+  await expect(page.locator('.object.at-1-1 .tree').first()).toHaveCSS('filter', /brightness\(0.55\)/);
+  await expect(page.locator('.sector.at-0-0 .floor')).toHaveCSS('filter', 'none');
   await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/frontier-responsive.png')});
   await page.setViewportSize({width:375,height:740});
   expect((await page.locator('.game-logo').boundingBox()).width).toBeCloseTo(await configuredLogoWidth(),0);

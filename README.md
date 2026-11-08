@@ -239,7 +239,7 @@ Fog of War toggles `fow-offline` on `<html>` when its coordinator enters offline
 
 - [Counter](examples/basic): a small counter site with directional page transitions. Run it on port 47180.
 - [Frontier](examples/frontier): a separate LiveView app with an isometric RTS-style reconnaissance map and constrained travel routes. Run it on port 47190.
-- [Generated wrappers](examples/wrappers): experimental Mob and ElixirKit shells; their startup limitations are documented in [WRAPPERS.md](WRAPPERS.md).
+- Native wrapper projects are generated beneath each example’s ignored `.fow/apps` directory. See [WRAPPERS.md](WRAPPERS.md).
 
 Each example is its own Mix project. From its directory, run `mix deps.get`, `mix assets.setup`, `mix assets.build`, then `mix phx.server`. The library is a local path dependency; neither example depends on the other.
 
@@ -315,4 +315,4 @@ A native host can pass a parsed index plus `readAsset: async (relativePath, {sig
 
 `await fogOfWar.cache.ready` waits for backend selection and migration; it resolves to `"indexedDB"`, `"localStorage"` or `"memory"`. `await fogOfWar.cache.flush()` also waits for pending captures. Browser storage remains subject to quota and eviction; importing a bundle does not grant persistent-storage permission.
 
-On macOS, `bash test/native/run.sh` builds the cached ElixirKit example and runs its actual WKWebView through export, interrupted import, reload/resume, binary gzip decoding and offline navigation. It needs the existing desktop build dependencies and does not build Android. Test projects and logs are written beneath `.fow/native-test/`.
+On macOS, `node test/native/frontier-outage.cjs` exercises a freshly generated WKWebView app through an actual Phoenix process outage and restart.

@@ -5,8 +5,13 @@ defmodule FogOfWarFrontier.Application do
     Supervisor.start_link(
       [
         {Phoenix.PubSub, name: FogOfWarFrontier.PubSub},
+        FogOfWarFrontier.Game.Cache,
+        FogOfWarFrontier.Game,
         FogOfWarFrontierWeb.Endpoint
-      ], strategy: :one_for_one, name: FogOfWarFrontier.Supervisor)
+      ],
+      strategy: :one_for_one,
+      name: FogOfWarFrontier.Supervisor
+    )
   end
 
   def config_change(changed, _, removed),
