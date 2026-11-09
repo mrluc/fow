@@ -1,16 +1,14 @@
 const {test, expect} = require('@playwright/test');
 test.use({baseURL: 'http://127.0.0.1:47192', viewport: {width: 375, height: 740}});
 
-test('hero controls show both states, pause, survive cached navigation and reconnect', async ({page}) => {
+test('one connection button switches actions and survives cached navigation', async ({page}) => {
   await page.goto('/lat/0/lon/0');
-  const controls = page.getByRole('group', {name: 'Server connection'});
-  const play = controls.locator('[data-connection="connect"]');
-  const pause = controls.locator('[data-connection="disconnect"]');
-  await expect(play).toHaveText('Connected');
-  await expect(play).toBeDisabled();
-  await expect(pause).toHaveText('Disconnect');
-  await expect(pause).toBeEnabled();
-  await expect(controls.locator('svg')).toHaveCount(2);
+  const controls = page.locator('#frontier-connection');
+  const toggle = controls.locator('[data-connection-toggle]');
+  const status = controls.locator('[data-connection-announcement]');
+  await expect(status).toHaveText('Online');
+  await expect(toggle).toHaveText('Go offline');
+  await expect(toggle).toHaveCount(1);
   const bounds = await controls.boundingBox();
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(375);
@@ -18,15 +16,14 @@ test('hero controls show both states, pause, survive cached navigation and recon
   expect(await page.evaluate(() => document.fonts.check('20px "Pirata One"'))).toBe(true);
   await expect.poll(() => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.length)).toBe(4);
   await expect(page.locator('[data-bar="health"]')).toHaveAttribute('value', '100');
-  await pause.click();
-  await expect(play).toHaveText('Connect');
-  await expect(pause).toHaveText('Disconnected');
-  await expect(pause).toBeDisabled();
+  await toggle.click();
+  await expect(status).toHaveText('Offline');
+  await expect(toggle).toHaveText('Go online');
   await expect(page.locator('html')).toHaveClass(/fow-offline/);
   await page.locator('.tile-target[href="/lat/1/lon/1"]').click();
   await expect(page.locator('#player')).toHaveClass(/at-1-1/);
   await expect(controls).toHaveCount(1);
-  await expect(play).toBeVisible();
+  await expect(toggle).toBeVisible();
   await expect.poll(() => page.locator('[data-bar="connection"]').evaluate(el => el.value)).toBeLessThan(100);
   await expect.poll(() => page.locator('[data-bar="move"]').evaluate(el => el.value)).toBe(100);
   await expect.poll(() => page.locator('[data-bar="health"]').evaluate(el => el.value)).toBeLessThan(100);
@@ -34,15 +31,15 @@ test('hero controls show both states, pause, survive cached navigation and recon
   await page.getByRole('link', {name: 'GitHub', exact: true}).click();
   await (await popup).close();
   await expect(page).toHaveURL(/\/lat\/1\/lon\/1$/);
-  await play.click();
-  await expect(play).toHaveText('Connected', {timeout: 15000});
+  await toggle.click();
+  await expect(status).toHaveText('Online', {timeout: 15000});
   await expect(page.locator('#player')).toHaveClass(/at-1-1/);
 });
 
 test('health and reconnect time count down to zero over nineteen seconds', async ({page}) => {
   await page.clock.install({time: new Date('2026-11-07T12:00:00Z')});
   await page.goto('/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await page.clock.pauseAt(new Date('2026-11-07T12:01:00Z'));
   await page.locator('[data-connection="disconnect"]').evaluate(el => el.click());
   await expect(page.locator('[data-connection-label]')).toHaveText('Reconnect 19s');
@@ -59,14 +56,14 @@ test('health and reconnect time count down to zero over nineteen seconds', async
 test('connection reserve refills at double the offline drain rate', async ({page}) => {
   await page.clock.install({time: new Date('2026-11-07T12:00:00Z')});
   await page.goto('/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await page.clock.pauseAt(new Date('2026-11-07T12:01:00Z'));
   await page.locator('[data-connection="disconnect"]').evaluate(el => el.click());
   await page.clock.runFor(6000);
   const drained = await page.locator('[data-bar="connection"]').evaluate(el => el.value);
   expect(drained).toBeCloseTo(13 / 19 * 100, 1);
   await page.locator('[data-connection="connect"]').evaluate(el => el.click());
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await expect(page.locator('[data-bar="connection"]')).toHaveJSProperty('value', drained);
   await page.clock.runFor(1000);
   expect(await page.locator('[data-bar="connection"]').evaluate(el => el.value)).toBeCloseTo(15 / 19 * 100, 1);

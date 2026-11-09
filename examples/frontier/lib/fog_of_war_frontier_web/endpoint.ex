@@ -46,5 +46,9 @@ defmodule FogOfWarFrontierWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+  if Mix.env() == :test do
+    plug FogOfWarFrontierWeb.BrowserFixture
+  end
+
   plug FogOfWarFrontierWeb.Router
 end

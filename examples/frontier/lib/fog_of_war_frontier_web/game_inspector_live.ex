@@ -139,9 +139,6 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
         >Step 100 ms</button>
         <button type="button" phx-click="reset_game">Reset game</button>
         <p>Process <code>{inspect(@game_server)}</code> · Tick <b id="game-tick">{@game.tick}</b></p>
-        <p>
-          The multiplayer map and this inspector read the same authoritative game state.
-        </p>
       </header>
       <div class="debug-columns">
         <section class="debug-map" aria-label="Full game map">
@@ -207,8 +204,8 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
             </div>
           </div>
         </section>
-        <section>
-          <section id="live-memory" aria-label="Player LiveView memory">
+        <section class="debug-data">
+          <section id="live-memory" class="debug-panel" aria-label="Player LiveView memory">
             <h2>Player LiveView memory</h2>
             <p>
               <b id="live-memory-total">{memory_size(
@@ -234,33 +231,39 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
               </tbody>
             </table>
           </section>
-          <h2>Players</h2>
-          <ul id="debug-players">
-            <li :for={{id, player} <- Enum.sort(@game.players)}>
-              <button type="button" phx-click="player" phx-value-id={id}>{id}</button>
-              {inspect(player.position)} · {player.health} HP · {player.connected_views} views
-            </li>
-          </ul>
-          <h2>Square {inspect(@square)}</h2>
-          <p>Terrain · grass and dirt · Pines {length(GameMap.trees(@square))}</p>
-          <p :if={occupants(@game, @square) == []}>No players</p>
-          <div :if={@game.monster.position == @square} class="debug-monster-detail">
-            <p>Split Brain beast · last move tick {@game.monster.last_move_tick}</p>
-            <pre :if={@selected == :monster}>{inspect(@game.monster, pretty: true)}</pre>
-            <img
-              src="/images/monster/256/monster-idle.png"
-              width="256"
-              height="256"
-              alt="Split Brain beast"
-            />
-          </div>
-          <pre
-            :for={player <- occupants(@game, @square)}
-            data-player-detail={player.id}
-            class={@selected == player.id && "selected"}
-          >{inspect(Map.from_struct(player), pretty: true)}</pre>
-          <h2>Recent actions</h2>
-          <pre id="game-events">{inspect(@game.recent, pretty: true)}</pre>
+          <section class="debug-panel debug-roster">
+            <h2>Players</h2>
+            <ul id="debug-players">
+              <li :for={{id, player} <- Enum.sort(@game.players)}>
+                <button type="button" phx-click="player" phx-value-id={id}>{id}</button>
+                {inspect(player.position)} · {player.health} HP · {player.connected_views} views
+              </li>
+            </ul>
+          </section>
+          <section class="debug-panel debug-selection">
+            <h2>Square {inspect(@square)}</h2>
+            <p>Terrain · grass and dirt · Pines {length(GameMap.trees(@square))}</p>
+            <p :if={occupants(@game, @square) == []}>No players</p>
+            <div :if={@game.monster.position == @square} class="debug-monster-detail">
+              <p>Split Brain beast · last move tick {@game.monster.last_move_tick}</p>
+              <pre :if={@selected == :monster}>{inspect(@game.monster, pretty: true)}</pre>
+              <img
+                src="/images/monster/256/monster-idle.png"
+                width="256"
+                height="256"
+                alt="Split Brain beast"
+              />
+            </div>
+            <pre
+              :for={player <- occupants(@game, @square)}
+              data-player-detail={player.id}
+              class={@selected == player.id && "selected"}
+            >{inspect(Map.from_struct(player), pretty: true)}</pre>
+          </section>
+          <section class="debug-panel debug-actions">
+            <h2>Recent actions</h2>
+            <pre id="game-events">{Enum.map_join(@game.recent, "\n", &inspect(&1, pretty: false, limit: :infinity))}</pre>
+          </section>
         </section>
       </div>
     </main>

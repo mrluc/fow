@@ -1,4 +1,4 @@
-# Deploy from the repository root; Frontier depends on the parent FoW package.
+# Deploy from the repository root; The examples depend on the parent FoW package.
 **/.git
 **/.fow
 **/_build
@@ -12,7 +12,6 @@
 **/erl_crash.dump
 **/*.tar
 examples/wrappers
-examples/basic
 results
 test
 .git

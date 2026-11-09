@@ -6,22 +6,36 @@
     <meta name="csrf-token" content={get_csrf_token()} />
     <title>Fog of War · The Green March</title>
     <link rel="preload" as="image" href="/images/scout-walk.png" />
+    <!-- frontier:css-image-preloads:start -->
+<!-- Regenerate with mix frontier.preload_images. -->
+<link rel="preload" as="image" href="/images/fog-of-war-logo.png" />
+<link rel="preload" as="image" href="/images/monster/256/monster-explosion-anchored-head.png" />
+<link rel="preload" as="image" href="/images/monster/256/monster-idle.png" />
+<link rel="preload" as="image" href="/images/monster/256/monster-recompose.png" />
+<link rel="preload" as="image" href="/images/monster/256/monster-spread-starfish.png" />
+<link rel="preload" as="image" href="/images/monster/256/monster-walk.png" />
+<link rel="preload" as="image" href="/images/old-paper.png" />
+<link rel="preload" as="image" href="/images/scout-idle.png" />
+<link rel="preload" as="image" href="/images/scout-walk.png" />
+<link rel="preload" as="image" href="/images/scout/256/scout-idle.png" />
+<link rel="preload" as="image" href="/images/terrain.png" />
+<link rel="preload" as="image" href="/images/tree/256/pine.png" />
+<!-- frontier:css-image-preloads:end -->
     <link phx-track-static rel="stylesheet" href="/css/app.css" />
     <script defer phx-track-static src="/assets/js/app.js">
     </script>
   </head>
   <body>
     {@inner_content}
-    <div id="frontier-connection" class="frontier-connection" role="group" aria-label="Server connection">
-      <button type="button" data-connection="connect" data-connection-toggle aria-pressed="false">
-        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 7 41 24 14 41Z" /></svg>
-        <span class="frontier-display" data-label="connect">Connect</span>
+    <div id="frontier-connection" class="frontier-connection" data-online="false" role="group" aria-label="Frontier controls">
+      <span class="frontier-display frontier-online-status" role="status"><small>You are</small><span data-connection-announcement>Offline</span></span>
+      <button type="button" data-connection="connect" data-connection-toggle aria-label="Go online">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path class="connection-play" d="M14 7 41 24 14 41Z" />
+          <path class="connection-pause" d="M11 7h9v34h-9zM28 7h9v34h-9z" />
+        </svg>
+        <span class="frontier-display" data-connection-action>Go online</span>
       </button>
-      <button type="button" data-connection="disconnect" data-connection-toggle disabled aria-pressed="true" class="is-active">
-        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M11 7h9v34h-9zM28 7h9v34h-9z" /></svg>
-        <span class="frontier-display" data-label="disconnect">Disconnected</span>
-      </button>
-      <span class="sr-only" data-connection-announcement role="status">Disconnected</span>
     </div>
     <FogOfWarFrontierWeb.GameBars.bars />
     <nav class="frontier-project-links" aria-label="Fog of War project">
@@ -29,5 +43,26 @@
       <a href="https://hex.pm/packages/fow" target="_blank" rel="noopener noreferrer"
         title="FoW package page, available when published">Hex</a>
     </nav>
+    <section id="fow-modal" class="paper-modal" data-paper-modal aria-labelledby="fow-title" hidden>
+      <button class="paper-modal-backdrop" type="button" data-paper-close aria-label="Close parchment"></button>
+      <article class="paper-modal-page" role="dialog" aria-modal="true" aria-labelledby="fow-title">
+        <button class="paper-modal-close" type="button" data-paper-close aria-label="Close">×</button>
+        <div class="paper-modal-content">
+          <p>What is the Fog of War?</p>
+          <p>Open the dev tools in the bottom-right corner, and follow
+            where you see the words "What's this?"</p>
+        </div>
+      </article>
+    </section>
+    <section id="demo-modal" class="paper-modal" data-paper-modal aria-labelledby="demo-title" hidden>
+      <button class="paper-modal-backdrop" type="button" data-paper-close aria-label="Close parchment"></button>
+      <article class="paper-modal-page" role="dialog" aria-modal="true" aria-labelledby="demo-title">
+        <button class="paper-modal-close" type="button" data-paper-close aria-label="Close">×</button>
+        <div class="paper-modal-content">
+          <p>This place uses the Fog of War, and its online and offline navigation, as a game mechanic.</p>
+          <p>Disappear from the over-world, reappear somewhere else.</p>
+        </div>
+      </article>
+    </section>
   </body>
 </html>

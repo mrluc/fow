@@ -22,7 +22,7 @@ The emblem, pine, standing scout, and walking scout are original generated PNGs 
 
 ## Walking transitions
 
-`assets/js/map-transitions.js` connects LiveView's document patch callback and Fog of War's cached navigation to the same View Transition API. The scout has a named view-transition element; its before/after positions interpolate across the map while CSS alternates the idle and walking snapshots. The actual scout returns to its idle pose when the transition finishes. Terrain and tile targets remain still. Reduced-motion preferences and browsers without the API apply navigation immediately. This is a simple two-pose walk, not a full directional animation set.
+The scout walks in the map at every viewport size. LiveView patches and cached navigation both animate the scout’s position and depth, so it can pass behind trees while the camera moves. CSS alternates the two walk poses. Reduced-motion preferences apply the new position immediately.
 
 `test/map_test.exs` checks routes, adjacency and tile counts. The package's `test/browser/frontier.spec.cjs` checks initial preloading, transitions, whole-tile navigation, fog layers, absence of page chrome, missing destinations, and immediate Back after cached moves. Neither the tests nor the app sleep to make history work.
 
@@ -110,7 +110,9 @@ Game checkpoints live in ETS owned by the separately supervised `Game.Cache` pro
 Frontier runs at https://fow.fly.dev. From the FoW repository root, using a current Fly CLI:
 
 ```sh
-fly deploy . --config examples/frontier/fly.toml --remote-only --ha=false
+bin/deploy example frontier
+# With examples/frontier/fly.staging.toml present:
+# bin/deploy example frontier staging
 fly status --app fow
 fly logs --app fow
 ```
@@ -143,7 +145,7 @@ fly secrets set --app fow \
   FRONTIER_INSPECTOR_PASSWORD='choose-a-password'
 ```
 
-Visit `https://fow.fly.dev/dev/game` and enter those credentials in the browser prompt. HTTP Basic Auth protects the initial request; a signed-session proof is checked again on LiveView mount in its separate `live_session`. Missing/wrong credentials return 401. An enabled production inspector without a password still returns 404. Changing the password invalidates old mount proofs. Local development remains open unless a password is configured.
+Visit `https://fow.fly.dev/inspector` and enter those credentials in the browser prompt. HTTP Basic Auth protects the initial request; a signed-session proof is checked again on LiveView mount in its separate `live_session`. Missing/wrong credentials return 401. An enabled production inspector without a password still returns 404. Changing the password invalidates old mount proofs. Local development remains open unless a password is configured.
 
 
 Frontier explicitly uses `<FogOfWar.dev_tools enabled={true} ... />` so the public demo includes the tools in production. Other applications can set `enabled={@user.can_debug}`; an explicit boolean overrides application configuration.

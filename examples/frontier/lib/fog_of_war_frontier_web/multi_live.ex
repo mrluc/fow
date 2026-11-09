@@ -30,6 +30,7 @@ defmodule FogOfWarFrontierWeb.MultiLive do
         player_state: nil,
         player_status: nil,
         acknowledged_life: 0,
+        fresh_join: false,
         respawn_pending: nil
       )
 
@@ -40,6 +41,13 @@ defmodule FogOfWarFrontierWeb.MultiLive do
     with {lat, ""} <- Integer.parse(lat),
          {lon, ""} <- Integer.parse(lon),
          true <- lat in 0..3 and lon in 0..3 do
+      fresh_join =
+        connected?(socket) && socket.assigns.player_id &&
+          is_nil(read(socket.assigns.game_server).players[socket.assigns.player_id])
+
+      socket =
+        if fresh_join, do: assign(socket, acknowledged_life: -1, fresh_join: true), else: socket
+
       game =
         if connected?(socket) && socket.assigns.player_id do
           Game.observe_sync(
@@ -130,7 +138,12 @@ defmodule FogOfWarFrontierWeb.MultiLive do
 
       socket =
         socket
-        |> assign(acknowledged_life: life, respawn_pending: nil, player_status: nil)
+        |> assign(
+          acknowledged_life: life,
+          fresh_join: false,
+          respawn_pending: nil,
+          player_status: nil
+        )
         |> refresh_game(game)
         |> push_patch(to: path(lat, lon))
 
@@ -159,7 +172,11 @@ defmodule FogOfWarFrontierWeb.MultiLive do
            socket.assigns.respawn_pending != player.life do
         socket
         |> assign(respawn_pending: player.life)
-        |> push_event("frontier:respawn", %{life: player.life, player_id: player.id})
+        |> push_event("frontier:respawn", %{
+          life: player.life,
+          player_id: player.id,
+          fresh_join: socket.assigns.fresh_join
+        })
       else
         socket
       end
@@ -171,8 +188,9 @@ defmodule FogOfWarFrontierWeb.MultiLive do
       if player && connected?(socket) do
         status = %{
           paused: Map.get(game, :paused, false),
-          health: if(socket.assigns.respawn_pending, do: 0, else: player.health),
-          dead: player.health <= 0 or not is_nil(socket.assigns.respawn_pending),
+          health: player.health,
+          clearing_cache: not is_nil(socket.assigns.respawn_pending),
+          dead: player.health <= 0,
           life: player.life,
           lives: player.lives,
           respawn_remaining_ms:

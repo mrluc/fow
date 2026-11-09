@@ -1,4 +1,14 @@
-const {test, expect} = require('@playwright/test');
+const {test: base, expect} = require('@playwright/test');
+const test = base.extend({
+  peacefulGame: async ({request}, use) => {
+    await expect(await request.post('/__browser/monster/disable')).toBeOK();
+    try {
+      await use();
+    } finally {
+      await expect(await request.post('/__browser/monster/enable')).toBeOK();
+    }
+  },
+});
 test.use({baseURL: 'http://127.0.0.1:47192', viewport: {width: 640, height: 800}});
 
 test('multiplayer streams preserve cached navigation, history, HUD and camera', async ({page}) => {
@@ -78,10 +88,10 @@ test('server health repairs an old zero-HP prediction and shared tabs follow acc
   await other.close();
 });
 
-test('reconnect keeps an explored destination with another tab connected and explicitly paced offline moves', async ({page, context}) => {
+test('reconnect keeps an explored destination with another tab connected and explicitly paced offline moves', async ({page, context, peacefulGame}) => {
   test.setTimeout(45000);
   await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   const visit = async path => {
     await page.locator(`a[href="${path}"]`).click();
     await expect(page).toHaveURL(new RegExp(path + '$'));
@@ -94,7 +104,7 @@ test('reconnect keeps an explored destination with another tab connected and exp
   await page.evaluate(() => window.fogOfWar.cache.flush());
   const other = await context.newPage();
   await other.goto('/multi/lat/0/lon/0');
-  await expect(other.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(other.locator('[data-connection-announcement]')).toHaveText('Online');
   await page.locator('[data-connection="disconnect"]').click();
   const departure = Date.now();
   await visit('/multi/lat/0/lon/1');
@@ -103,7 +113,7 @@ test('reconnect keeps an explored destination with another tab connected and exp
   await page.waitForTimeout(1100);
   expect(Date.now() - departure).toBeGreaterThanOrEqual(2200);
   await page.locator('[data-connection="connect"]').click();
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected', {timeout: 15000});
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online', {timeout: 15000});
   await expect(page).toHaveURL(/\/multi\/lat\/0\/lon\/2$/);
   await expect(page.locator('#player')).toHaveClass(/at-0-2/);
   await expect(other).toHaveURL(/\/multi\/lat\/0\/lon\/2$/);
@@ -112,7 +122,7 @@ test('reconnect keeps an explored destination with another tab connected and exp
 
 test('inspector reset respawns a connected player and clears old cached exploration', async ({page, context}) => {
   await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await expect.poll(() => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.length)).toBe(4);
   const inspector = await context.newPage();
   await inspector.goto('/dev/game');
@@ -126,9 +136,9 @@ test('inspector reset respawns a connected player and clears old cached explorat
 });
 
 
-test('reported journey: reconnect from 0,2 at preloaded 1,0 after 3.8 seconds offline', async ({page}) => {
+test('reported journey: reconnect from 0,2 at preloaded 1,0 after 3.8 seconds offline', async ({page, peacefulGame}) => {
   await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await page.locator('a[href="/multi/lat/0/lon/1"]').click();
   await expect(page).toHaveURL(/\/multi\/lat\/0\/lon\/1$/);
   await page.waitForTimeout(1100);
@@ -144,14 +154,14 @@ test('reported journey: reconnect from 0,2 at preloaded 1,0 after 3.8 seconds of
   await expect(page).toHaveURL(/\/multi\/lat\/1\/lon\/0$/);
   await page.waitForTimeout(Math.max(0, 3800 - (Date.now() - departed)));
   await page.locator('[data-connection="connect"]').click();
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected', {timeout: 15000});
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online', {timeout: 15000});
   await expect(page).toHaveURL(/\/multi\/lat\/1\/lon\/0$/);
   await expect(page.locator('#player')).toHaveClass(/at-1-0/);
 });
 
 test('an open DevTools socket cannot masquerade as a connected player; Connect restores the page', async ({page}) => {
   await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   const original = await page.locator('[data-phx-main]').getAttribute('id');
   await page.evaluate(() => {
     window.liveSocket.main.destroy();
@@ -165,7 +175,7 @@ test('an open DevTools socket cannot masquerade as a connected player; Connect r
   await expect(tools.locator('.dot').first()).toHaveCSS('animation-name', 'none');
   await expect(page.locator('[data-connection="connect"]')).toBeEnabled();
   await page.locator('[data-connection="connect"]').click();
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await expect(page.locator('[data-phx-main]')).not.toHaveAttribute('id', original);
   await expect(page.locator('[data-bar="health"]')).toHaveJSProperty('value', 100);
   await expect(tools.locator('[data-state]')).toHaveText('Live');
@@ -174,7 +184,7 @@ test('an open DevTools socket cannot masquerade as a connected player; Connect r
 
 test('socket reopening automatically recovers a retired main page', async ({page}) => {
   await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   const original = await page.locator('[data-phx-main]').getAttribute('id');
   await page.evaluate(() => {
     window.liveSocket.main.destroy();
@@ -182,5 +192,5 @@ test('socket reopening automatically recovers a retired main page', async ({page
     window.liveSocket.disconnect(() => window.liveSocket.connect());
   });
   await expect(page.locator('[data-phx-main]')).not.toHaveAttribute('id', original);
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
 });

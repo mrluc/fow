@@ -1,3 +1,4 @@
+Application.put_env(:fog_of_war_frontier, :browser_fixtures, true)
 Application.put_env(:fow, :dev_tools, true)
 endpoint = FogOfWarFrontierWeb.Endpoint
 config = Application.get_env(:fog_of_war_frontier, endpoint)

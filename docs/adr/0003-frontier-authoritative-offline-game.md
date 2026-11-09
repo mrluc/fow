@@ -236,3 +236,8 @@ The inspector route has its own HTTP pipeline and live_session with an on_mount 
 
 
 Monster decisions and explosion damage now require a living player with connected_views > 0 on the square. Disconnected player records remain for offline movement reconciliation and health decay but do not attract or receive beast explosions. Connection ownership is updated by monitoring the LiveView process; clean transport closure is observed through process termination, while a lost network can require transport timeout. Another connected tab keeps the player present.
+
+
+A player ID absent from the current game triggers the cache-clear acknowledgement on join, including after the two-minute offline reaper removed its record. The fresh-join flag forces clearing even if an old browser marker already says life zero; it suppresses the respawn notification. Reconnecting to an existing player does not clear remembered routes. This is Frontier game policy and leaves generic FoW caching unchanged.
+
+The inspector is a viewport-sized workbench: compact toolbar, full-map pane and independently scrolling memory, player, selection and action panes. Recent actions use small monospace text with one unwrapped event per line and horizontal scrolling.

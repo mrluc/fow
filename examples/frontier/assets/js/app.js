@@ -6,6 +6,7 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {FogOfWar, installFogOfWar, FOG_OF_WAR_BUILD} from "fow"
 import {createMapTransitions} from "./map-transitions"
+import {installPaperModal} from "./paper-modal"
 
 const viewport = installMapViewport()
 const transitions = createMapTransitions(viewport.refresh)
@@ -18,6 +19,7 @@ window.liveSocket = liveSocket
 window.fogOfWar = fogOfWar
 installDemoUI(fogOfWar)
 installGameBars(fogOfWar)
+installPaperModal()
 
 // Real public HTTP renders, not invented client states. This is example-specific preloading.
 // Never move the current tab's route protection while saving these neighboring pages.

@@ -6,8 +6,8 @@
 @media (max-width: 799px) {
   .map-viewport { touch-action: none; user-select: none; cursor: grab; }
   .map-viewport.is-panning, .map-viewport.is-panning .tile-target { cursor: grabbing; }
-  .map-viewport.pannable .scout.walking { animation: frontier-stride 160ms steps(1, end) 4; }
 }
+.map-viewport .scout.walking { animation: frontier-stride 160ms steps(1, end) 4; }
 @keyframes frontier-stride {
   0%, 100% { background-image: url('/images/scout-idle.png'); }
   50% { background-image: url('/images/scout-walk.png'); }

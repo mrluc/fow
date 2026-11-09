@@ -1,11 +1,13 @@
 .entity-layer { position: absolute; width: 0; height: 0; z-index: 3; pointer-events: none; }
 .entity-slot { position: absolute; left: 0; top: 0; }
-.entity-slot:nth-child(6n+1) { transform: translate(-25px, 5px); }
-.entity-slot:nth-child(6n+2) { transform: translate(25px, -7px); }
-.entity-slot:nth-child(6n+3) { transform: translate(-8px, -20px); }
-.entity-slot:nth-child(6n+4) { transform: translate(8px, 15px); }
-.entity-slot:nth-child(6n+5) { transform: translate(-38px, -10px); }
-.entity-slot:nth-child(6n+6) { transform: translate(38px, 10px); }
+.entity-slot:nth-child(6n+1) { --slot-y: 5; transform: translate(-25px, calc(var(--slot-y) * 1px)); }
+.entity-slot:nth-child(6n+2) { --slot-y: -7; transform: translate(25px, calc(var(--slot-y) * 1px)); }
+.entity-slot:nth-child(6n+3) { --slot-y: -20; transform: translate(-8px, calc(var(--slot-y) * 1px)); }
+.entity-slot:nth-child(6n+4) { --slot-y: 15; transform: translate(8px, calc(var(--slot-y) * 1px)); }
+.entity-slot:nth-child(6n+5) { --slot-y: -10; transform: translate(-38px, calc(var(--slot-y) * 1px)); }
+.entity-slot:nth-child(6n+6) { --slot-y: 10; transform: translate(38px, calc(var(--slot-y) * 1px)); }
+#map-scene .entity-slot { z-index: calc(var(--tile-depth) + var(--slot-y, 0)); }
+#map-scene .entity-slot:has(.entity-monster) { z-index: calc(var(--tile-depth) + var(--slot-y, 0) + 12); }
 .entity-sprite {
   display: block; position: absolute; width: 52px; height: 58px; left: -26px; bottom: 0;
   background-position: center bottom; background-size: contain; background-repeat: no-repeat;
@@ -56,3 +58,17 @@
 }
 
 .frontier-paused .entity-sprite { animation-play-state: paused; }
+
+/* One row; increasingly overlap and shrink sprites instead of growing the HUD. */
+.lives-row { min-width: 0; }
+.lives-row > span:first-child, [data-lives-count] { flex-shrink: 0; }
+[data-lives-icons] { flex: 1; min-width: 0; flex-wrap: nowrap; height: 26px; align-items: center; overflow: hidden; }
+[data-lives-icons] > * { flex-shrink: 0; }
+[data-lives-icons]:is(.lives-compact, .lives-dense, .lives-packed) {
+  display: grid; grid-template-columns: repeat(var(--life-icons), minmax(0, 1fr));
+  gap: 0; padding-right: var(--life-width); align-items: center;
+}
+[data-lives-icons].lives-compact { --life-width: 16px; }
+[data-lives-icons].lives-dense { --life-width: 12px; }
+[data-lives-icons].lives-packed { --life-width: 8px; }
+[data-lives-icons]:is(.lives-compact, .lives-dense, .lives-packed) > * { width: var(--life-width); height: 26px; }

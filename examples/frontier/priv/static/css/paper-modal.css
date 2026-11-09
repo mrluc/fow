@@ -1,0 +1,33 @@
+@font-face {
+  font-family: 'Eagle Lake';
+  src: url('/fonts/EagleLake-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+.paper-modal[hidden] { display: none; }
+.paper-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; }
+.paper-modal-backdrop { position: absolute; inset: 0; border: 0; background: #080b0780; cursor: default; }
+.paper-modal-page {
+  position: relative; container-type: inline-size; width: min(100vw, calc(100dvh * 0.75)); aspect-ratio: 1086 / 1448; max-height: 100dvh; overflow: auto;
+  color: #352514; background: transparent url('/images/old-paper.png') center / contain no-repeat;
+  filter: drop-shadow(0 3px 5px #0009);
+
+}
+.paper-modal-content {
+  position: absolute; inset: 10% 10%; overflow: auto;
+  font: 5cqi/1.4 'Eagle Lake', Georgia, serif;
+}
+.paper-modal-content h1 { margin: 0 0 1em; text-align: center; font: inherit; }
+.paper-modal-content p { margin: 0 0 1em; }
+.paper-modal-close {
+  position: absolute; top: 3.7cqi; right: 5.15cqi; display: grid; place-items: center;
+  width: 10.2cqi; height: 10.2cqi; border: 0; padding: 0; background: transparent;
+  color: #352514; font: 6.8cqi/1 'Pirata One', Georgia, serif; cursor: pointer;
+}
+.paper-modal-trigger { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.paper-modal-trigger:hover { color: #b99a55; }
+.paper-modal-close { border-radius: 50%; }
+.paper-modal-close:hover { color: #352514; background: #ead2a099; }
+body.paper-modal-open { overflow: hidden; }

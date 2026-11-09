@@ -10,7 +10,7 @@ defmodule FogOfWar.DevToolsLive do
     scale = Map.get(session, "scale", 1.0)
     unless is_number(scale) and scale > 0, do: raise(ArgumentError, "DevTools scale must be a positive number")
     {:ok,
-     assign(socket, css: @css, semi_transparent: Map.get(session, "semi_transparent", false), scale: scale),
+     assign(socket, dock: Map.get(session, "dock", "bottom"), css: @css, semi_transparent: Map.get(session, "semi_transparent", false), scale: scale),
      layout: false}
   end
 
@@ -18,7 +18,7 @@ defmodule FogOfWar.DevToolsLive do
     ~H"""
     <aside id="fog-of-war-dev-tools-panel" phx-hook="FogOfWarDevTools"
       style={"--fog-of-war-dev-tools-scale: #{@scale};"}
-      data-fog-of-war-dev-tools data-semi-transparent={to_string(@semi_transparent)} phx-update="ignore">
+      data-fog-of-war-dev-tools data-default-dock={@dock} data-semi-transparent={to_string(@semi_transparent)} phx-update="ignore">
       <template>
         <style><%= Phoenix.HTML.raw(@css) %></style>
         <section class="tools" aria-label="Fog of War developer tools">

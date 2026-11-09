@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo 'Usage: bin/deploy example <name> [environment]' >&2
+  exit 2
+}
+
+[[ $# -ge 2 && $# -le 3 && $1 == example ]] || usage
+[[ $2 =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || usage
+if [[ $# == 3 ]]; then
+  [[ $3 =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || usage
+  config="examples/$2/fly.$3.toml"
+else
+  config="examples/$2/fly.toml"
+fi
+
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+if [[ ! -f $config ]]; then
+  printf 'Fly config not found: %s\n' "$config" >&2
+  exit 1
+fi
+
+exec fly deploy . --config "$config" --remote-only --ha=false

@@ -1,10 +1,10 @@
 # Counter
 
-A small LiveView site with a counters index and three counter pages. The routed pages opt into Fog of War so their complete rendered state can be revisited offline. The developer panel is a separate sticky LiveView, fixed at the lower right in development only.
+A small LiveView site with a counters index and three counter pages. The routed pages opt into Fog of War so their complete rendered state can be revisited offline. The developer panel is a separate sticky LiveView, available in development and on the hosted demo.
 
 Start it from this directory with `source ../../../env.sh && mix phx.server`. Open `http://127.0.0.1:47180/`.
 
-The app's content contains only the counter experience. Its shared layout includes `<FogOfWar.dev_tools socket={@socket} />` from the parent package, and `config/dev.exs` enables it with `config :fow, dev_tools: true`. The package owns the sticky LiveView, its hook, isolated styling, connection control and cache explorer. The example has no panel-specific JavaScript or CSS. Other environments leave it disabled by default.
+The app's content contains only the counter experience. Its shared layout includes `<FogOfWar.dev_tools socket={@socket} />` from the parent package, and `config/dev.exs` enables it with `config :fow, dev_tools: true`. The package owns the sticky LiveView, its hook, isolated styling, connection control and cache explorer. The example has no panel-specific JavaScript or CSS. The production demo enables it so visitors can try offline navigation.
 
 Expand the launcher to inspect Cache or Help. The header pause/play control disconnects or reconnects the socket. Cache lists stored routes and navigation attempts; select a record to inspect its metadata and HTML. Snapshots use IndexedDB when available, with a localStorage fallback. Clear unused preserves routes open in cooperating Fog of War tabs and touches only FoW cache entries.
 
@@ -94,3 +94,7 @@ adb -s emulator-5554 shell dumpsys window displays > /tmp/counter-window-insets.
 ```
 
 The comparison artifacts from this run are in the repository's ignored `results/android-layout/` directory, including rectangle JSON for both apps and Mob's Counter tree/insets report.
+
+## Fly.io
+
+The public demo is at https://fow-counters.fly.dev. Deploy from the repository root with `bin/deploy example basic`. The Fly app needs a `SECRET_KEY_BASE` secret. The machine can stop while idle. The counters share an in-memory Agent, so a machine restart resets them.

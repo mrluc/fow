@@ -30,7 +30,7 @@ export function installDevToolsLayout(el, root) {
   overlay.innerHTML = docks.map((dock,i) => `<span class="dock-target" data-dock-target="${dock}" style="--anchor-x:${anchors[i][0]*100}%;--anchor-y:${anchors[i][1]*100}%">${dockName(dock)}</span>`).join('') + '<span class="dock-cursor"></span>'
   root.appendChild(overlay)
   const cursor = overlay.querySelector('.dock-cursor')
-  let layout = {dock:'bottom', width:560, height:250, split:58}
+  let layout = {dock:docks.includes(el.dataset.defaultDock) ? el.dataset.defaultDock : 'bottom', width:560, height:250, split:58}
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORE))
     if (saved && docks.includes(saved.dock) && ['width','height','split'].every(k => Number.isFinite(saved[k]))) layout = saved

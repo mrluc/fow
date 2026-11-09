@@ -3,7 +3,7 @@ test.use({baseURL: 'http://127.0.0.1:47192'});
 
 test('negative lives show spent scouts plus red debt, and death desaturates the scout', async ({page}) => {
   await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await expect(page.locator('[data-lives-count]')).toHaveText('3');
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('phx:frontier:player', {detail: {
     health: 0, dead: true, lives: -2, life: 5, respawn_remaining_ms: 5000, move_remaining_ms: 0,
@@ -50,14 +50,14 @@ test('offline death reconnects, clears remembered routes and respawns automatica
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await expect.poll(() => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.length)).toBe(4);
   await page.locator('[data-connection="disconnect"]').click();
   await expect(page.locator('[data-bar="health"]')).toHaveJSProperty('value', 0, {timeout: 23000});
   await expect(page.locator('#frontier-death')).toContainText('You died');
   await expect(page.locator('[data-lives-count]')).toHaveText('2');
   await page.locator('[data-connection="connect"]').click();
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected', {timeout: 10000});
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online', {timeout: 10000});
   await expect(page.locator('#frontier-death')).toContainText('Respawned', {timeout: 10000});
   await expect(page.locator('[data-bar="health"]')).toHaveJSProperty('value', 100);
   await expect(page.locator('[data-lives-count]')).toHaveText('2');
@@ -95,8 +95,14 @@ test('connected death at desktop width restores scout color after respawn', asyn
 
 test('respawn teleports without reusing the dead scout walking snapshot', async ({page}) => {
   await page.setViewportSize({width: 1200, height: 900});
+  await page.addInitScript(() => {
+    window.addEventListener('phx:frontier:player', ({detail}) => {
+      window.frontierJoinReady = !detail.clearing_cache;
+    });
+  });
   await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection="connect"]')).toHaveText('Connected');
+  await page.waitForFunction(() => window.frontierJoinReady === true);
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await page.evaluate(() => {
     window.frontierMoves = 0;
     window.addEventListener('frontier:moved', () => window.frontierMoves++);

@@ -3,6 +3,7 @@
 @import url('/css/demo-ui.css');
 @import url('/css/game-bars.css');
 @import url('/css/entities.css');
+@import url('/css/paper-modal.css');
 /* Frontier: painted sprites over procedural earth. */
 :root { color-scheme: dark; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; --paper: #20261d; --ink: #e3dfbf; --muted: #9da58a; --line: #444c35; --accent: #ddbf72; background: #11160f; color: var(--ink); }
 * { box-sizing: border-box; } body { margin: 0; min-width: 340px; } a { color: inherit; text-decoration: none; } button { font: inherit; }
@@ -10,31 +11,30 @@
 .map-viewport { width: 100%; height: 100dvh; position: relative; overflow: hidden; }
 .map-scene { position: absolute; left: 50%; top: 50%; width: 640px; height: 420px; margin-left: -320px; margin-top: -176px; transform-origin: 320px 176px; transform: scale(var(--map-scale, 1)); isolation: isolate; }
 .ground-layer,.objects-layer { position: absolute; inset: 0; pointer-events: none; }.ground-layer { z-index: 1; }.objects-layer { z-index: 2; }
+/* World sprites share a stack. Depth is the map-space Y of each sprite base. */
+#map-scene :is(.objects-layer, .entity-layer) { z-index: auto; }
+.tree { z-index: calc(var(--tile-depth) + 6); }
+#map-scene .scout { z-index: calc(var(--tile-depth) + 7); }
+#map-scene .travel-layer { z-index: 1000; }
 .sector,.object { position: absolute; width: 0; height: 0; }
 .floor { position: absolute; left: -48px; top: -48px; width: 96px; height: 96px; display: grid; grid-template-columns: repeat(3,32px); transform: rotateX(60deg) rotateZ(45deg); box-shadow: 3px 3px #17210f, 4px 4px #5b654433; }
 .terrain-tile { display: block; width: 32px; height: 32px; background-image: url('/images/terrain.png'); background-size: 384px 384px; }
 .sector.current .floor { outline: 1px solid #e3c77f; outline-offset: -1px; }
 .screen-fog { display: none !important; } /* Older cached markup. */
 .sector.fow-nav-uncached:not(.current) .floor { filter: brightness(0); box-shadow: 3px 3px #090e07; }
-.tree { display: block; position: absolute; left: -47px; bottom: -6px; width: 66px; height: 100px; background: url('/images/pine.png') center bottom / contain no-repeat; filter: drop-shadow(3px 3px 2px #0005); }.second-tree { left: 12px; bottom: 3px; width: 49px; height: 74px; }
+.tree { display: block; position: absolute; left: -47px; bottom: -6px; width: 66px; height: 100px; background: url('/images/tree/256/pine.png') center bottom / contain no-repeat; filter: drop-shadow(3px 3px 2px #0005); }.second-tree { left: 12px; bottom: 3px; width: 49px; height: 74px; }
 .object.fow-nav-uncached:not(.current) .tree { display: none; }
 /* Remembered tiles are dimmed, as is the current tile when offline. */
 .sector:not(.current, .fow-nav-uncached) .floor,
 .fow-offline .sector.current .floor { filter: saturate(.45) brightness(.55); }
 .object:not(.current, .fow-nav-uncached) .tree,
 .fow-offline .object.current .tree { filter: saturate(.45) brightness(.55) drop-shadow(3px 3px 2px #0005); }
-.scout { position: absolute; width: 52px; height: 58px; margin-left: -0px; margin-top: -51px; background: url('/images/scout-idle.png') center bottom / contain no-repeat; z-index: 3; view-transition-name: frontier-scout; pointer-events: none; filter: grayscale(0) drop-shadow(1px 3px 1px #0006); }
+.scout { position: absolute; width: 52px; height: 58px; margin-left: -0px; margin-top: -51px; background: url('/images/scout-idle.png') center bottom / contain no-repeat; z-index: 3; pointer-events: none; filter: grayscale(0) drop-shadow(1px 3px 1px #0006); }
 .scout.walking { background-image: url('/images/scout-walk.png'); }
 .travel-layer { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .tile-target { position: absolute; width: 136px; height: 68px; margin-left: -68px; margin-top: -34px; clip-path: polygon(50% 0,100% 50%,50% 100%,0 50%); pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .tile-target:hover { background: #ffe6a126; }.tile-target:focus-visible { outline: none; background: #ffe6a15c; }
 .fow-offline .tile-target.fow-nav-uncached { cursor: not-allowed; background: none; }
-::view-transition-old(root),::view-transition-new(root) { animation: none; }
-::view-transition-group(frontier-scout) { animation-duration: 650ms; animation-timing-function: linear; }
-::view-transition-old(frontier-scout) { animation: idle-frame 160ms steps(1,end) 4; mix-blend-mode: normal; }
-::view-transition-new(frontier-scout) { animation: walk-frame 160ms steps(1,end) 4; mix-blend-mode: normal; }
-@keyframes idle-frame { 0%,100% {opacity:1} 50% {opacity:0} }@keyframes walk-frame { 0%,100% {opacity:0} 50% {opacity:1} }
-@media (prefers-reduced-motion: reduce) { ::view-transition-group(*) { animation-duration: 0s !important; } }
 
 /* Logo sizing: edit these three viewport shares and the optional desktop cap. */
 :root {

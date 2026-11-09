@@ -25,3 +25,6 @@ config :logger, level: :info
 
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.
+
+# The public demo uses this panel to demonstrate offline navigation.
+config :fow, dev_tools: true

@@ -5,17 +5,11 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
   await page.setViewportSize({width:900,height:800});
   const errors=[]; page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => {
-    const start=document.startViewTransition.bind(document);
-    window.mapTransitions=0; window.scoutMoves=[];
-    document.startViewTransition=update=>{
-      const from=document.getElementById('player')?.getBoundingClientRect();
-      window.mapTransitions++;
-      const transition=start(update);
-      transition.ready.then(()=>{
-        const scout=document.getElementById('player'),to=scout?.getBoundingClientRect();
-        if(from&&to)window.scoutMoves.push({from:[from.x,from.y],to:[to.x,to.y],pose:getComputedStyle(scout).backgroundImage});
-      }).catch(error=>window.scoutMoves.push({error:error.message}));
-      return transition;
+    const animate=Element.prototype.animate;
+    window.playerAnimations=[];
+    Element.prototype.animate=function(keyframes, options){
+      if(this.id==='player')window.playerAnimations.push({keyframes, walking:this.classList.contains('walking')});
+      return animate.call(this,keyframes,options);
     };
   });
   await page.goto('/lat/0/lon/0');
@@ -34,9 +28,15 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
   expect(await page.locator('body').evaluate(el => el.scrollHeight <= innerHeight)).toBe(true);
   await page.locator('.tile-target[href="/lat/1/lon/1"]').click();
   await expect(page.locator('#player')).toHaveClass(/at-1-1/);
-  await expect.poll(()=>page.evaluate(()=>window.mapTransitions)).toBeGreaterThan(0);
-  await expect.poll(()=>page.evaluate(()=>window.scoutMoves.length)).toBeGreaterThan(0);
-  expect(await page.evaluate(()=>window.scoutMoves.some(m=>m.from&&JSON.stringify(m.from)!==JSON.stringify(m.to)&&m.pose.includes('scout-walk.png')))).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>window.playerAnimations.length)).toBeGreaterThan(0);
+  const moveFrames=await page.evaluate(()=>window.playerAnimations.find(m=>m.walking)?.keyframes);
+  expect(moveFrames).toHaveLength(2);
+  expect(moveFrames[0].left).toBe(moveFrames[1].left); // This diagonal projects straight down.
+  expect(moveFrames[0].top).not.toBe(moveFrames[1].top);
+  const tree = page.locator('.object.at-0-1 .tree').first();
+  const treeDepth = await tree.evaluate(el => Number(getComputedStyle(el).zIndex));
+  expect(Number(moveFrames[0].zIndex)).toBeLessThan(treeDepth);
+  expect(Number(moveFrames[1].zIndex)).toBeGreaterThan(treeDepth);
   await expect(page.locator('.tile-target')).toHaveCount(8);
   await page.locator('.tile-target[href="/lat/0/lon/0"]').click();
   await expect(page.locator('#player')).toHaveClass(/at-0-0/);
@@ -53,7 +53,7 @@ test('procedural 4×4 world seeds three real neighbors, animates the scout, and 
   await page.locator('.tile-target[href="/lat/0/lon/1"]').click();
   await expect(page.locator('#player')).toHaveClass(/at-0-1/);
   await page.goBack();await expect(page.locator('#player')).toHaveClass(/at-1-1/);
-  await page.evaluate(()=>Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{}))));
+  await page.evaluate(()=>Promise.all(document.querySelector("#player").getAnimations().map(a=>a.finished.catch(()=>{}))));
   await expect(page.locator('#player')).not.toHaveClass(/walking/);
   expect(requests).toEqual([]);expect(errors).toEqual([]);
   await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/frontier-offline.png'),fullPage:true});
@@ -115,14 +115,14 @@ test.describe('narrow camera', () => {
     expect(await page.locator('.game-logo').boundingBox()).toEqual(logo);
     await page.locator('a[href="/lat/1/lon/0"]').tap();
     await expect(page).toHaveURL(/\/lat\/1\/lon\/0$/);
-    await page.evaluate(()=>Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{}))));
+    await page.evaluate(()=>Promise.all(document.querySelector("#player").getAnimations().map(a=>a.finished.catch(()=>{}))));
     // Opening the DevTools isn't needed to prove the camera is independent of connection state.
     await page.evaluate(()=>window.fogOfWar.toggleConnection());
     await expect(page.locator('html')).toHaveClass(/fow-offline/);
     await page.locator('a[href="/lat/1/lon/1"]').tap();
     await expect(page).toHaveURL(/\/lat\/1\/lon\/1$/);
     await expect(page.locator('.map-viewport')).toHaveClass(/pannable/);
-    await page.evaluate(()=>Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{}))));
+    await page.evaluate(()=>Promise.all(document.querySelector("#player").getAnimations().map(a=>a.finished.catch(()=>{}))));
     await expect(page.locator('#player')).toBeInViewport();
     expect(await page.locator('body').evaluate(el => el.scrollHeight <= innerHeight)).toBe(true);
     await page.screenshot({path:require('node:path').resolve(__dirname,'../../results/frontier-mobile-camera.png')});

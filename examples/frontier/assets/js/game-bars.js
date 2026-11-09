@@ -30,10 +30,44 @@ export function installGameBars(fogOfWar) {
   const icons = panel.querySelector('[data-lives-icons]')
   let renderedLives
   let noticeUntil = 0
+  let clearingCache = false
   let paused = false
   let pausedAt = 0
   let authoritative = false
   let animation
+
+  const damageAnimations = new WeakMap()
+  const heavyDamage = document.createElement('div')
+  heavyDamage.className = 'frontier-heavy-damage'
+  heavyDamage.setAttribute('aria-hidden', 'true')
+  document.body.append(heavyDamage)
+  let heavyAnimation
+  function showDamage(amount) {
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (amount >= 20) {
+      heavyAnimation?.cancel()
+      heavyAnimation = heavyDamage.animate([
+        {opacity: 0}, {opacity: .95, offset: .08},
+        {opacity: .48, offset: .3}, {opacity: 0},
+      ], {duration: reduced ? 300 : 750, easing: 'ease-out'})
+    }
+    for (const target of [document.getElementById('player'), panel]) {
+      if (!target) continue
+      damageAnimations.get(target)?.cancel()
+      const scout = target.id === 'player'
+      const base = getComputedStyle(target).filter
+      const tint = scout ? 'sepia(1) saturate(6) hue-rotate(315deg) brightness(1.25)' : base
+      const flash = scout ? {} : {boxShadow: '0 0 18px 5px #ef514880', backgroundColor: '#a722222b'}
+      const frames = [
+        {offset: 0, filter: base, translate: '0 0', boxShadow: '0 0 0 0 transparent'},
+        {offset: .12, filter: tint, translate: reduced ? '0 0' : '0 -4px', ...flash},
+        {offset: .32, filter: base, translate: '0 0', boxShadow: '0 0 0 0 transparent'},
+        {offset: .48, filter: tint, translate: reduced ? '0 0' : '0 -2px', ...flash},
+        {offset: 1, filter: base, translate: '0 0', boxShadow: '0 0 0 0 transparent', backgroundColor: 'transparent'},
+      ]
+      damageAnimations.set(target, target.animate(frames, {duration: reduced ? 200 : 650, easing: 'ease-out'}))
+    }
+  }
 
   function update(now = Date.now()) {
     const previousHealth = state.health
@@ -65,6 +99,7 @@ export function installGameBars(fogOfWar) {
       state.lives--
       state.deathAt = now - Math.max(0, state.elapsed - lifetime(state.offlineHealth ?? rules.health_max))
     }
+    if (state.health < previousHealth) showDamage(previousHealth - state.health)
     document.documentElement.classList.toggle('frontier-dead', state.health <= 0)
     if (death) {
       const dead = state.health <= 0
@@ -83,8 +118,15 @@ export function installGameBars(fogOfWar) {
         icon.className = 'life-scout ' + className
         icons.append(icon)
       }
-      for (let i = 0; i < Math.max(rules.initial_lives, state.lives); i++) add(i < state.lives ? '' : 'life-spent')
-      for (let i = 0; i < -state.lives; i++) add('life-debt')
+      for (let i = 0; i < Math.min(100, Math.max(rules.initial_lives, state.lives)); i++) add(i < state.lives ? '' : 'life-spent')
+      for (let i = 0; i < Math.min(100, -state.lives); i++) add('life-debt')
+      const count = icons.childElementCount
+      icons.classList.toggle('lives-compact', count > 12 && count <= 24)
+      icons.classList.toggle('lives-dense', count > 24 && count <= 48)
+      icons.classList.toggle('lives-packed', count > 48)
+      icons.style.setProperty('--life-icons', count)
+      icons.title = `${state.lives} lives`
+
     }
     health.value = state.health
     health.textContent = Math.round(state.health) + ' health'
@@ -115,9 +157,11 @@ export function installGameBars(fogOfWar) {
   window.addEventListener('phx:frontier:player', ({detail}) => {
     update()
     authoritative = true
+    clearingCache = !!detail.clearing_cache
     paused = !!detail.paused
     pausedAt = Date.now()
     document.documentElement.classList.toggle('frontier-paused', paused)
+    if (detail.health < state.health && !detail.fresh_join) showDamage(state.health - detail.health)
     state.health = detail.health
     state.lives = detail.lives ?? state.lives
     if (detail.dead) state.deathAt = Date.now() - (rules.respawn_delay_ms - detail.respawn_remaining_ms)
@@ -147,7 +191,7 @@ export function installGameBars(fogOfWar) {
     update()
   })
   window.addEventListener('click', event => {
-    if ((paused || state.health <= 0) && event.target.closest?.('.tile-target')) {
+    if ((paused || clearingCache || state.health <= 0) && event.target.closest?.('.tile-target')) {
       event.preventDefault()
       event.stopImmediatePropagation()
     }
@@ -158,12 +202,13 @@ export function installGameBars(fogOfWar) {
 // Ask for a fresh record after a backgrounded tab resumes, even if nothing changed.
 export const FrontierPlayer = {
   mounted() {
-    this.handleEvent('frontier:respawn', async ({life, player_id}) => {
+    this.handleEvent('frontier:respawn', async ({life, player_id, fresh_join = false}) => {
       window.dispatchEvent(new Event('frontier:respawning'))
       const marker = `frontier:respawn:${player_id}`
       try {
-        const notify = sessionStorage.getItem(marker) !== String(life)
-        if (notify) {
+        const clear = fresh_join || sessionStorage.getItem(marker) !== String(life)
+        const notify = !fresh_join && clear
+        if (clear) {
           const cache = window.fogOfWar.cache
           await cache.flush()
           const {rows} = await cache.inspect()

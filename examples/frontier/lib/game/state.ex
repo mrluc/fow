@@ -146,6 +146,10 @@ defmodule FogOfWarFrontier.Game.State do
     walk_monster(state)
   end
 
+  if Mix.env() == :test do
+    defp walk_monster(%{monster: %{mode: :disabled}} = state), do: state
+  end
+
   defp walk_monster(state) do
     if rem(state.tick, Rules.monster_move_ticks()) == 0 do
       occupied =

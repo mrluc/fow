@@ -48,7 +48,7 @@
     "dev": {},
     "prod": {
       "web": {
-        "origin": "https://counters.example"
+        "origin": "https://fow-counters.fly.dev"
       },
       "app": {
         "identifier": "dev.fogofwar.counters.production"

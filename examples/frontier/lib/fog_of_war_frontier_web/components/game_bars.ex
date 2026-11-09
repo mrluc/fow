@@ -19,6 +19,10 @@ defmodule FogOfWarFrontierWeb.GameBars do
       data-health-max={@health_max}
       data-game-rules={Jason.encode!(@rules)}
     >
+      <nav class="frontier-help-links" aria-label="About Frontier">
+        <button type="button" class="paper-modal-trigger frontier-display" data-paper-open="demo-modal">What is this place?</button>
+        <button type="button" class="paper-modal-trigger frontier-display" data-paper-open="fow-modal">What is the Fog of War?</button>
+      </nav>
       <div class="lives-row">
         <span>Lives</span><output data-lives-count>{@rules.initial_lives}</output><span
           data-lives-icons

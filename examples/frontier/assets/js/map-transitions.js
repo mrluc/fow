@@ -1,40 +1,42 @@
-// Desktop uses a named scout snapshot. Narrow screens animate the live map/scout
-// so the screen-space fog and fixed logo keep their normal stacking order.
+// Animate the live map and scout so screen-space overlays keep their stacking order.
 export function createMapTransitions(refreshViewport = () => {}) {
   let pending = null
   let current = location.pathname
   let queue = Promise.resolve()
-  let active
   let respawning = false
   window.addEventListener('frontier:respawning', () => {
     respawning = true
-    active?.skipTransition()
     liveGeneration++
     liveAnimations.forEach(animation => animation.cancel())
     liveAnimations = []
     document.getElementById('player')?.classList.remove('walking')
   })
   window.addEventListener('phx:frontier:player', ({detail}) => {
-    if (!detail.dead) respawning = false
+    if (!detail.dead && !detail.clearing_cache) respawning = false
   })
   let liveAnimations = [], liveGeneration = 0
   const moveInPage = async update => {
-    const beforePlayer = getComputedStyle(document.getElementById('player'))
+    const initialPlayer = document.getElementById('player'), initialScene = document.getElementById('map-scene')
+    if (!initialPlayer || !initialScene) return update()
+    const beforePlayer = getComputedStyle(initialPlayer)
     const from = {left: beforePlayer.left, top: beforePlayer.top,
-      transform: getComputedStyle(document.getElementById('map-scene')).transform}
+      zIndex: beforePlayer.zIndex, transform: getComputedStyle(initialScene).transform}
     const generation = ++liveGeneration
     liveAnimations.forEach(animation => animation.cancel())
-    active?.skipTransition()
     update()
     await Promise.resolve()
     const scene = document.getElementById('map-scene'), player = document.getElementById('player')
+    if (!scene || !player) return
     player.classList.add('walking')
     refreshViewport()
     const destination = getComputedStyle(player)
     const timing = {duration:650, easing:'linear'}
     liveAnimations = [
       scene.animate([{transform:from.transform}, {transform:getComputedStyle(scene).transform}], timing),
-      player.animate([{left:from.left, top:from.top}, {left:destination.left, top:destination.top}], timing),
+      player.animate([
+        {left:from.left, top:from.top, zIndex:from.zIndex},
+        {left:destination.left, top:destination.top, zIndex:destination.zIndex},
+      ], timing),
     ]
     const animations = liveAnimations
     const paint = () => {
@@ -60,26 +62,12 @@ export function createMapTransitions(refreshViewport = () => {}) {
     const teleport = respawning
     const run = () => {
       if (changed && !teleport) window.dispatchEvent(new Event("frontier:moved"))
-      if (teleport || !changed || !document.getElementById('player') || !document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (teleport || !changed || !document.getElementById('player') || matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const result = update()
         refreshViewport()
         return result
       }
-      if (innerWidth < 800) return moveInPage(update)
-      active?.skipTransition()
-      active = document.startViewTransition(async () => {
-        update()
-        // Flush class observers without waiting on the rendering clock.
-        await Promise.resolve()
-        document.getElementById('player')?.classList.add('walking')
-        refreshViewport()
-      })
-      const running = active
-      running.ready.catch(() => {})
-      running.finished.catch(() => {}).then(() => {
-        if (active === running) document.getElementById('player')?.classList.remove('walking')
-      })
-      return running.updateCallbackDone
+      return moveInPage(update)
     }
     queue = queue.then(run, run)
     return queue

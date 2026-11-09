@@ -16,13 +16,16 @@ defmodule FogOfWarFrontierWeb.Router do
     plug FogOfWarFrontierWeb.InspectorAuth
   end
 
-  scope "/dev", FogOfWarFrontierWeb do
+  scope "/", FogOfWarFrontierWeb do
     pipe_through [:browser, :inspector]
 
     live_session :game_debug,
       root_layout: {FogOfWarFrontierWeb.Layouts, :debug},
       on_mount: [FogOfWarFrontierWeb.InspectorAuth] do
-      live "/game", GameInspectorLive
+      live "/inspector", GameInspectorLive
+      if Application.compile_env(:fog_of_war_frontier, :dev_routes, false) do
+        live "/dev/game", GameInspectorLive
+      end
     end
   end
 

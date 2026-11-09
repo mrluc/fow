@@ -28,12 +28,12 @@ defmodule FogOfWarFrontier.InspectorAuthTest do
   test "production inspector fails closed without explicit enabled credentials" do
     for config <- [[], [enabled: true], [enabled: false, password: "test-password"]] do
       Application.put_env(@app, :inspector, config)
-      assert get(build_conn(), "/dev/game").status == 404
+      assert get(build_conn(), "/inspector").status == 404
     end
   end
 
   test "missing or wrong credentials are challenged; correct credentials mount LiveView" do
-    assert get(build_conn(), "/dev/game").status == 401
+    assert get(build_conn(), "/inspector").status == 401
 
     wrong =
       Plug.Conn.put_req_header(
@@ -42,7 +42,7 @@ defmodule FogOfWarFrontier.InspectorAuthTest do
         Plug.BasicAuth.encode_basic_auth("admin", "wrong")
       )
 
-    assert get(wrong, "/dev/game").status == 401
+    assert get(wrong, "/inspector").status == 401
 
     conn =
       Plug.Conn.put_req_header(
@@ -51,7 +51,7 @@ defmodule FogOfWarFrontier.InspectorAuthTest do
         Plug.BasicAuth.encode_basic_auth("admin", "test-password")
       )
 
-    {:ok, view, _} = live(conn, "/dev/game")
+    {:ok, view, _} = live(conn, "/inspector")
     assert has_element?(view, "#pause-game")
   end
 
@@ -65,7 +65,7 @@ defmodule FogOfWarFrontier.InspectorAuthTest do
         "authorization",
         Plug.BasicAuth.encode_basic_auth("admin", "test-password")
       )
-      |> get("/dev/game")
+      |> get("/inspector")
 
     session = Plug.Conn.get_session(conn)
     assert {:cont, _} = InspectorAuth.on_mount(:default, %{}, session, %Phoenix.LiveView.Socket{})

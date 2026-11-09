@@ -25,6 +25,10 @@ defmodule FogOfWar do
   attr(:socket, :any, required: true)
   attr(:enabled, :boolean, default: nil)
 
+  attr(:dock, :string, default: "bottom",
+    values: ~w(top-left top top-right bottom-right bottom bottom-left),
+    doc: "Initial dock; a saved user layout takes precedence")
+
   attr(:semi_transparent, :boolean, default: false)
 
   attr(:scale, :any,
@@ -45,7 +49,7 @@ defmodule FogOfWar do
     <%= if @show do %>
       {Phoenix.Component.live_render(@socket, FogOfWar.DevToolsLive,
         id: "fog-of-war-dev-tools", sticky: true,
-        session: %{"semi_transparent" => @semi_transparent, "scale" => @scale})}
+        session: %{"dock" => @dock, "semi_transparent" => @semi_transparent, "scale" => @scale})}
     <% end %>
     """
   end
