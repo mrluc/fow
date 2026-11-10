@@ -42,6 +42,26 @@ test('multiplayer streams preserve cached navigation, history, HUD and camera', 
   expect(errors).toEqual([]);
 });
 
+test('offline movement at desktop width keeps the map scale during the walk', async ({page, peacefulGame}) => {
+  await page.setViewportSize({width: 1280, height: 900});
+  await page.goto('/multi/lat/0/lon/0');
+  await expect.poll(() => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.length)).toBe(4);
+  await expect(page.locator('#map-scene')).toHaveCSS('transform', /^matrix\(2\./);
+  await page.evaluate(() => {
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (frames, options) {
+      if (this.id === 'map-scene') window.walkTransforms = frames.map(frame => frame.transform);
+      return animate.call(this, frames, options);
+    };
+  });
+  await page.locator('[data-connection="disconnect"]').click();
+  await page.locator('a[href="/multi/lat/0/lon/1"]').click();
+  await expect(page.locator('#player')).toHaveClass(/walking/);
+  const [start, end] = await page.evaluate(() => window.walkTransforms);
+  expect(end).toBe(start);
+  await expect(page.locator('#player')).not.toHaveClass(/walking/);
+});
+
 test('other entities use client CSS slots with stable server order', async ({browser}) => {
   const contexts = await Promise.all([0, 1, 2].map(() => browser.newContext()));
   try {

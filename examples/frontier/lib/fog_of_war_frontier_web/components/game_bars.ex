@@ -20,7 +20,11 @@ defmodule FogOfWarFrontierWeb.GameBars do
       data-game-rules={Jason.encode!(@rules)}
     >
       <nav class="frontier-help-links" aria-label="About Frontier">
-        <button type="button" class="paper-modal-trigger frontier-display" data-paper-open="demo-modal">What is this place?</button>
+        <button
+          type="button"
+          class="paper-modal-trigger frontier-display"
+          data-paper-open="demo-modal"
+        >What is this place?</button>
         <button type="button" class="paper-modal-trigger frontier-display" data-paper-open="fow-modal">What is the Fog of War?</button>
       </nav>
       <div class="lives-row">
@@ -45,6 +49,7 @@ defmodule FogOfWarFrontierWeb.GameBars do
         value="0"
       >Disconnected</progress></label>
     </section>
+    <div id="frontier-slay-notice" role="status" phx-update="ignore"></div>
     <aside id="frontier-death" class="frontier-death" hidden role="status" aria-live="polite">
       <strong data-death-title>You died</strong><span data-death-detail></span>
     </aside>

@@ -3,7 +3,11 @@ defmodule FogOfWarFrontier.Game.Rules do
   def tick_ms, do: 100
   def connection_recovery_multiplier, do: 2
   def monster_move_ticks, do: 30
-  def monster_damage, do: 70
+  def monster_damage, do: 49
+  def monster_health, do: 200
+  def monster_respawn_ticks, do: 60
+  def attack_cost, do: 20
+  def attack_damage, do: 100
   def health_max, do: 100
   def initial_lives, do: 3
   def preloaded_squares, do: [{0, 0}, {0, 1}, {1, 0}, {1, 1}]
@@ -24,6 +28,7 @@ defmodule FogOfWarFrontier.Game.Rules do
       respawn_delay_ms: respawn_ticks() * tick_ms(),
       connection_recovery_multiplier: connection_recovery_multiplier(),
       health_max: health_max(),
+      attack_cost: attack_cost(),
       move_recharge_ms: move_recharge_ms(),
       offline_threshold: offline_threshold(),
       offline_fast_damage: offline_fast_damage(),

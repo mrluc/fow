@@ -1,3 +1,5 @@
+import {pulseDamage} from './damage-pulse'
+
 // Predict while disconnected; multiplayer server snapshots reconcile the HUD online.
 export function installGameBars(fogOfWar) {
   const panel = document.getElementById('frontier-bars')
@@ -8,6 +10,7 @@ export function installGameBars(fogOfWar) {
   const connection = panel.querySelector('[data-bar="connection"]')
   const label = panel.querySelector('[data-connection-label]')
   const key = 'frontier:bar-prediction:v1'
+  const multiplayer = /^\/multi(?:\/|$)/.test(location.pathname)
   const lifetime = hp => 1000 * (
     Math.ceil(Math.max(0, hp - rules.offline_threshold) / rules.offline_fast_damage) +
     Math.ceil(Math.min(hp, rules.offline_threshold) / rules.offline_slow_damage)
@@ -34,9 +37,9 @@ export function installGameBars(fogOfWar) {
   let paused = false
   let pausedAt = 0
   let authoritative = false
+  let lastAttackTick
   let animation
 
-  const damageAnimations = new WeakMap()
   const heavyDamage = document.createElement('div')
   heavyDamage.className = 'frontier-heavy-damage'
   heavyDamage.setAttribute('aria-hidden', 'true')
@@ -51,22 +54,8 @@ export function installGameBars(fogOfWar) {
         {opacity: .48, offset: .3}, {opacity: 0},
       ], {duration: reduced ? 300 : 750, easing: 'ease-out'})
     }
-    for (const target of [document.getElementById('player'), panel]) {
-      if (!target) continue
-      damageAnimations.get(target)?.cancel()
-      const scout = target.id === 'player'
-      const base = getComputedStyle(target).filter
-      const tint = scout ? 'sepia(1) saturate(6) hue-rotate(315deg) brightness(1.25)' : base
-      const flash = scout ? {} : {boxShadow: '0 0 18px 5px #ef514880', backgroundColor: '#a722222b'}
-      const frames = [
-        {offset: 0, filter: base, translate: '0 0', boxShadow: '0 0 0 0 transparent'},
-        {offset: .12, filter: tint, translate: reduced ? '0 0' : '0 -4px', ...flash},
-        {offset: .32, filter: base, translate: '0 0', boxShadow: '0 0 0 0 transparent'},
-        {offset: .48, filter: tint, translate: reduced ? '0 0' : '0 -2px', ...flash},
-        {offset: 1, filter: base, translate: '0 0', boxShadow: '0 0 0 0 transparent', backgroundColor: 'transparent'},
-      ]
-      damageAnimations.set(target, target.animate(frames, {duration: reduced ? 200 : 650, easing: 'ease-out'}))
-    }
+    pulseDamage(document.getElementById('player'))
+    pulseDamage(panel, {hud: true})
   }
 
   function update(now = Date.now()) {
@@ -86,12 +75,12 @@ export function installGameBars(fogOfWar) {
       state.connectionRemaining = Math.max(0, state.connectionRemaining - elapsed)
       state.elapsed += elapsed
       const hits = Math.floor(state.elapsed / 1000) - state.damageHits
-      if (hits > 0) {
+      if (hits > 0 && state.health > 0) {
         const fast = Math.min(hits, Math.max(0,
           Math.ceil((state.health - rules.offline_threshold) / rules.offline_fast_damage)))
         if (fast) state.health = Math.max(rules.offline_threshold,
           state.health - fast * rules.offline_fast_damage)
-        state.health = Math.max(0, state.health - (hits - fast) * rules.offline_slow_damage)
+        state.health = Math.max(multiplayer ? 1 : 0, state.health - (hits - fast) * rules.offline_slow_damage)
         state.damageHits += hits
       }
     }
@@ -161,7 +150,10 @@ export function installGameBars(fogOfWar) {
     paused = !!detail.paused
     pausedAt = Date.now()
     document.documentElement.classList.toggle('frontier-paused', paused)
-    if (detail.health < state.health && !detail.fresh_join) showDamage(state.health - detail.health)
+    const cast = detail.last_attack_tick != null && detail.last_attack_tick !== lastAttackTick
+    lastAttackTick = detail.last_attack_tick
+    const damage = state.health - detail.health - (cast ? rules.attack_cost : 0)
+    if (damage > 0 && !detail.fresh_join) showDamage(damage)
     state.health = detail.health
     state.lives = detail.lives ?? state.lives
     if (detail.dead) state.deathAt = Date.now() - (rules.respawn_delay_ms - detail.respawn_remaining_ms)

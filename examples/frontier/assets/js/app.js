@@ -1,3 +1,4 @@
+import "./elixir-strike"
 import {FrontierEntities} from "./entities"
 import {installGameBars, FrontierPlayer} from "./game-bars"
 import {installDemoUI} from "./demo-ui"

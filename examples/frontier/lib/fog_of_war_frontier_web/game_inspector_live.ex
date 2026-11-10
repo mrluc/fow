@@ -18,6 +18,7 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
     {:ok,
      assign(socket,
        memory_samples: %{},
+       last_memory_bytes: nil,
        game_server: server,
        game: read(server),
        square: {0, 0},
@@ -31,9 +32,13 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
     samples =
       socket.assigns.memory_samples
       |> Game.LiveMemory.prune(now)
-      |> Map.put(sample.view_id, Map.put(sample, :received_at, now))
+      |> Map.put(sample.tab_id, Map.put(sample, :received_at, now))
 
-    {:noreply, assign(socket, memory_samples: samples)}
+    {:noreply,
+     assign(socket,
+       memory_samples: samples,
+       last_memory_bytes: Game.LiveMemory.total_bytes(sample)
+     )}
   end
 
   def handle_info(:prune_memory, socket) do
@@ -119,6 +124,26 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
       |> Enum.sort_by(& &1.id)
 
   def render(assigns) do
+    count = map_size(assigns.memory_samples)
+
+    bytes =
+      Enum.sum(for {_, sample} <- assigns.memory_samples, do: Game.LiveMemory.total_bytes(sample))
+
+    {sample_bytes, sample_count} =
+      if count > 0, do: {bytes, count}, else: {assigns.last_memory_bytes, 1}
+
+    assigns =
+      assign(assigns,
+        memory_total: bytes,
+        memory_count: count,
+        memory_capacity:
+          if sample_bytes do
+            for {label, mib} <- [{"256 MiB", 256}, {"1 GiB", 1024}, {"4 GiB", 4096}] do
+              {label, div(mib * 1024 * 1024 * sample_count, sample_bytes)}
+            end
+          end
+      )
+
     ~H"""
     <main class="game-debug" data-paused={to_string(Map.get(@game, :paused, false))}>
       <header>
@@ -164,7 +189,10 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
                   title={"#{player.id} · #{player.health} HP"}
                 ></button>
               </span>
-              <span :if={@game.monster.position == {lat, lon}} class="entity-slot">
+              <span
+                :if={@game.monster.mode != :banished && @game.monster.position == {lat, lon}}
+                class="entity-slot"
+              >
                 <button
                   type="button"
                   phx-click="monster"
@@ -186,7 +214,10 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
                 <strong :if={occupants(@game, {lat, lon}) != []} class="debug-player-count">{length(
                   occupants(@game, {lat, lon})
                 )}</strong>
-                <i :if={@game.monster.position == {lat, lon}} class="debug-monster"></i>
+                <i
+                  :if={@game.monster.mode != :banished && @game.monster.position == {lat, lon}}
+                  class="debug-monster"
+                ></i>
               </span>
             </div>
             <div class="travel-layer">
@@ -205,28 +236,37 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
           </div>
         </section>
         <section class="debug-data">
-          <section id="live-memory" class="debug-panel" aria-label="Player LiveView memory">
-            <h2>Player LiveView memory</h2>
+          <section id="live-memory" class="debug-panel" aria-label="Memory by tab">
+            <h2>Memory by tab</h2>
             <p>
-              <b id="live-memory-total">{memory_size(
-                Enum.sum(for {_, sample} <- @memory_samples, do: sample.bytes)
-              )}</b>
-              total · {map_size(@memory_samples)} connected views
+              <b id="live-memory-total">{memory_size(@memory_total)}</b>
+              total · {@memory_count} connected tabs
+            </p>
+            <p :if={@memory_capacity} id="live-memory-capacity">
+              <b>Estimated tabs by RAM</b>
+              <span :for={{label, count} <- @memory_capacity}> · {label}: {count}</span>
+              <span :if={@memory_count == 0}> · last sample</span>
             </p>
             <p>
-              Per-process memory, sampled each second. Excludes shared binaries, socket processes and ETS. Multiple tabs are separate views. Reports expire after 3 seconds.
+              LiveView and WebSocket process memory, sampled each second. Excludes the game server, ETS, shared binaries and OS socket buffers. Reports expire after 3 seconds.
             </p>
             <table>
               <thead>
                 <tr>
-                  <th>Player</th><th>LiveView</th><th>Memory</th><th>Mailbox</th>
+                  <th>Player</th><th>Tab transport</th><th>LiveView</th><th>WebSocket</th><th>
+                    Total
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                <tr :for={{id, sample} <- Enum.sort(@memory_samples)} data-memory-view={id}>
-                  <td>{sample.player_id}</td><td>{id}</td><td>{memory_size(sample.bytes)}</td><td>
-                    {sample.messages}
+                <tr :for={{id, sample} <- Enum.sort(@memory_samples)} data-memory-tab={id}>
+                  <td>{sample.player_id}</td>
+                  <td>{id}</td>
+                  <td title={"#{sample.messages} LiveView mailbox messages"}>
+                    {memory_size(sample.bytes)}
                   </td>
+                  <td>{if sample.socket_bytes, do: memory_size(sample.socket_bytes), else: "—"}</td>
+                  <td>{memory_size(Game.LiveMemory.total_bytes(sample))}</td>
                 </tr>
               </tbody>
             </table>
@@ -245,7 +285,9 @@ defmodule FogOfWarFrontierWeb.GameInspectorLive do
             <p>Terrain · grass and dirt · Pines {length(GameMap.trees(@square))}</p>
             <p :if={occupants(@game, @square) == []}>No players</p>
             <div :if={@game.monster.position == @square} class="debug-monster-detail">
-              <p>Split Brain beast · last move tick {@game.monster.last_move_tick}</p>
+              <p>
+                Split Brain beast · {@game.monster.mode} · {Map.get(@game.monster, :health, 200)} HP · last move tick {@game.monster.last_move_tick}
+              </p>
               <pre :if={@selected == :monster}>{inspect(@game.monster, pretty: true)}</pre>
               <img
                 src="/images/monster/256/monster-idle.png"

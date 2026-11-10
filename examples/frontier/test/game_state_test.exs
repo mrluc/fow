@@ -21,9 +21,16 @@ defmodule FogOfWarFrontier.GameStateTest do
   test "offline death occurs at 19 seconds and respawn waits another five" do
     state = connected() |> State.dispatch({:disconnect, "a"}) |> ticks(90)
     assert state.players["a"].health == 10
+    last_chance = ticks(state, 99)
+    saved = State.dispatch(last_chance, {:connect, "a", {0, 0}})
+    assert saved.players["a"].health == 1
+    assert saved.players["a"].lives == 3
+    assert saved.players["a"].death_tick == nil
+
     dead = ticks(state, 100)
     assert dead.players["a"].death_tick == 190
     assert dead.players["a"].health == 0
+    assert State.dispatch(dead, {:connect, "a", {0, 0}}).players["a"].health == 0
     assert ticks(dead, 49).players["a"].health == 0
     respawn = ticks(dead, 50)
     assert respawn.players["a"].lives == 2
@@ -143,9 +150,35 @@ defmodule FogOfWarFrontier.GameStateTest do
     state = connected() |> State.dispatch({:connect, "b", {0, 0}})
     attacked = State.dispatch(state, {:attack, "a", "b"})
     assert attacked.players["a"].health == 80
-    assert attacked.players["b"].health == 30
+    assert attacked.players["b"].health == 0
+    assert attacked.players["a"].player_kills == 1
     assert attacked.players["a"].charge_ready_tick == 10
     assert hd(State.dispatch(attacked, {:attack, "a", "b"}).recent).result == :not_ready
+  end
+
+  test "two charged hits banish the beast and earn the attacker a life" do
+    state = State.new() |> State.dispatch({:connect, "a", {3, 3}})
+    assert state.monster.health == 200
+
+    hit = State.dispatch(state, {:attack, "a", :monster})
+    assert hit.monster.health == 100
+    assert hit.players["a"].monster_kills == 0
+    assert hit.players["a"].health == 80
+    assert hd(State.dispatch(hit, {:attack, "a", :monster}).recent).result == :not_ready
+
+    banished = hit |> ticks(10) |> State.dispatch({:attack, "a", :monster})
+    assert banished.monster.mode == :banished
+    assert banished.monster.health == 0
+    assert banished.players["a"].lives == 4
+    assert banished.players["a"].monster_kills == 1
+    assert ticks(banished, 59).monster.mode == :banished
+
+    returned = ticks(banished, 60)
+    assert returned.monster.health == 200
+    assert returned.monster.position != {3, 3}
+
+    assert hd(State.dispatch(returned, {:attack, "a", :monster}).recent).result ==
+             :different_square
   end
 
   test "the reported 0,2 to preloaded 1,0 journey is accepted after 38 offline ticks" do
@@ -252,7 +285,7 @@ defmodule FogOfWarFrontier.GameStateTest do
     occupied = State.dispatch(state, {:connect, "online", {3, 3}})
     exploded = State.step(occupied)
     assert exploded.monster.mode == :exploding
-    assert exploded.players["online"].health == 30
+    assert exploded.players["online"].health == 51
     assert exploded.players["offline"].health == 90
   end
 end

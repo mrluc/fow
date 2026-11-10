@@ -14,6 +14,8 @@ defmodule FogOfWarFrontier.Game.Player do
     :death_tick,
     lives: Rules.initial_lives(),
     life: 0,
+    monster_kills: 0,
+    player_kills: 0,
     health: Rules.health_max(),
     explored: 0,
     connected_views: 0,
@@ -118,6 +120,16 @@ defmodule FogOfWarFrontier.Game.Player do
   end
 
   def attack(player, target, tick) do
+    with {:ok, attacker} <- prepare_attack(player, target, tick) do
+      victim = damage(target, Rules.attack_damage(), tick)
+      attacker = if victim.health == 0, do: record_kill(attacker, :player_kills), else: attacker
+      {:ok, attacker, victim}
+    end
+  end
+
+  def record_kill(player, counter), do: Map.update(player, counter, 1, &(&1 + 1))
+
+  def prepare_attack(player, target, tick) do
     cond do
       player.connected_views == 0 ->
         {:error, :offline}
@@ -135,11 +147,11 @@ defmodule FogOfWarFrontier.Game.Player do
         attacker =
           damage(
             %{player | charge_ready_tick: tick + Rules.move_ticks(), last_attack_tick: tick},
-            20,
+            Rules.attack_cost(),
             tick
           )
 
-        {:ok, attacker, damage(target, 70, tick)}
+        {:ok, attacker}
     end
   end
 

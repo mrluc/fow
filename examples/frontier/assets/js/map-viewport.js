@@ -4,13 +4,16 @@ import {createMapCamera} from './map-camera'
 // Sprite fog is a CSS filter so transparent pixels stay transparent.
 export function installMapViewport() {
   let scheduled = false
+  const refresh = () => {
+    const scene = document.getElementById('map-scene')
+    if (scene) camera.update(scene, innerWidth, innerHeight)
+  }
   const schedule = () => {
     if (scheduled) return
     scheduled = true
     requestAnimationFrame(() => {
       scheduled = false
-      const scene = document.getElementById('map-scene')
-      if (scene) camera.update(scene, innerWidth, innerHeight)
+      refresh()
     })
   }
   const camera = createMapCamera(schedule)
@@ -20,7 +23,8 @@ export function installMapViewport() {
   })
   window.addEventListener('resize', schedule)
   schedule()
-  return {refresh: schedule}
+  // Route transitions need the camera transform before reading animation keyframes.
+  return {refresh}
 }
 
 // LiveView owns the map contents; the camera owns only these presentation values.

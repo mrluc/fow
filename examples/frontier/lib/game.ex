@@ -86,6 +86,19 @@ defmodule FogOfWarFrontier.Game do
   def handle_call({:act, action}, _, state) do
     state = %{state | game: State.dispatch(state.game, action)}
     publish(state)
+
+    case {action, List.first(state.game.recent)} do
+      {{:attack, _, :monster}, %{action: :attack, target: :monster, result: :ok} = attack} ->
+        Phoenix.PubSub.broadcast(
+          FogOfWarFrontier.PubSub,
+          topic(state.name),
+          {:monster_attack, state.name, attack}
+        )
+
+      _ ->
+        :ok
+    end
+
     {:reply, state.game, state}
   end
 

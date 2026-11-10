@@ -11,7 +11,7 @@ This is the requested design for the separate Frontier example. It introduces ga
 
 ## Health and offline time
 
-Every player has 100 total health. While offline, health drops by 10 percentage points each second until it reaches 10. At that threshold, damage drops to 1 percentage point per second. Health still reaches zero and the player dies. The accepted survival time from full health is 19 seconds offline.
+Every player has 100 total health. While offline, health drops by 10 percentage points each second until it reaches 10. At that threshold, damage drops to 1 percentage point per second. Health still reaches zero and the player dies. The accepted survival time from full health is 19 seconds offline. The multiplayer client predicts down to 1 HP and shows death or respawn when it receives the server state.
 
 The client hook displays this countdown while disconnected. Its rules come from server-provided component parameters so the values can be changed in one place. The server enforces the same rules against authoritative player state. Reconnecting cannot reset damage or replace server health with the client's displayed health.
 
@@ -49,7 +49,7 @@ Reconnection acceptance requires both a valid distance budget and an explored de
 
 The giant **Split Brain beast** moves randomly from square to square on the server. Its state and movement continue independently of the player's client. Players cannot determine its real position by inventing local state. Seeing the beast appear or move is driven by server state.
 
-Other players are also dangerous. A player can attack only with a full move bar. Attacking consumes that charge completely and costs the attacker 20 health, meaning 20% of the total 100. An attack deals 70 damage to another player on the attacker's square.
+Other players are also dangerous. A player can attack only with a full move bar. Attacking consumes that charge completely and costs the attacker 20 health, meaning 20% of the total 100. An attack deals 100 damage to another player on the attacker's square.
 
 A future extension could deal 20 damage to a target on an adjoining square. That extension is separate from the initial same-square attack.
 
@@ -191,7 +191,7 @@ After the server respawns a player, the view keeps the old square visible and pu
 
 ## Occupied-square monster decisions
 
-Every three seconds the monster checks for living players on its square. If any remain, it stays there in the exploding state. Otherwise it chooses a neighboring square and returns to idle. The streamed entity carries this state; CSS plays three equally timed explosion/flat/recovery frames followed by two idle frame intervals, totaling three seconds, and repeats until the next state change. Existing 256-pixel artwork supplies all frames. Each explosion now deals 70 HP to every living occupant on that square at the server decision tick, once per three-second cycle. This initial amount is centralized in Game.Rules.monster_damage/0; connected healing restores at most 30 HP between blasts, so staying put is lethal over repeated cycles. Damage uses Player.damage/3 so death and lives are accounted once. Dead players and players on other squares are not hit. Player attack controls remain pending.
+Every three seconds the monster checks for living players on its square. If any remain, it stays there in the exploding state. Otherwise it chooses a neighboring square and returns to idle. The streamed entity carries this state; CSS plays three equally timed explosion/flat/recovery frames followed by two idle frame intervals, totaling three seconds, and repeats until the next state change. Existing 256-pixel artwork supplies all frames. Each explosion deals 49 HP to every living occupant on that square at the server decision tick, once per three-second cycle. The amount is centralized in Game.Rules.monster_damage/0; connected healing restores at most 30 HP between blasts, so staying put is lethal over repeated cycles. Damage uses Player.damage/3 so death and lives are accounted once. Dead players and players on other squares are not hit. Clicking the beast casts an elixir strike. The beast has 200 HP, so two hits banish it. The last hit earns one life, and the beast returns on a different square after six seconds.
 
 
 Respawn is a teleport, not a movement animation. Before clearing the cache, the player hook signals the camera/transition controller to retire active scout snapshots and animations. The respawn patch bypasses walking snapshots and does not deplete the move bar. Normal movement resumes after the living player status arrives. The living scout explicitly declares grayscale(0), matching the death filter's function list, so returning to life resets desaturation rather than relying on removal of the grayscale filter. Browser tests cover restored opacity/color and bypassing the walking path; the native WKWebView probe also verifies the live scout's styles and captures its appearance after connected death and respawn.

@@ -37,13 +37,16 @@
 .fow-offline .entity-monster.monster-exploding { animation-play-state: paused; }
 .frontier-dead #player { opacity: .4; filter: grayscale(1) drop-shadow(1px 3px 1px #0006); transition: opacity .7s, filter .7s; }
 .frontier-dead .travel-layer { pointer-events: none; }
-.frontier-death {
+.frontier-death, #frontier-slay-notice:not(:empty) {
   position: fixed; z-index: 15; inset: 42% 12px auto; text-align: center;
   pointer-events: none; color: #f0e7d5; text-shadow: 0 2px 8px #000;
   font-family: 'Pirata One', serif;
 }
 .frontier-death[hidden] { display: none; }
-.frontier-death strong { display: block; font-size: clamp(2.5rem, 8vw, 5rem); }
+.frontier-death strong, #frontier-slay-notice:not(:empty) {
+  display: block; font-size: clamp(2.5rem, 8vw, 5rem); font-weight: bold;
+}
+#frontier-slay-notice:not(:empty) { inset-block-start: 20%; }
 .frontier-death span { display: block; font-size: 1.3rem; }
 .lives-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .lives-row > span:first-child { width: 65px; }

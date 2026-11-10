@@ -39,18 +39,39 @@ defmodule FogOfWarFrontier.Game.Cache do
 
   @doc false
   def write(table, game, views) do
-    previous =
-      case :ets.lookup(table, :snapshot) do
-        [{:snapshot, old}] -> old.players
-        [] -> %{}
+    previous_ids =
+      case :ets.lookup(table, :player_ids) do
+        [{:player_ids, ids}] -> ids
+        [] -> previous_player_ids(table)
       end
 
-    for id <- Map.keys(previous) -- Map.keys(game.players), do: :ets.delete(table, {:player, id})
+    ids = MapSet.new(Map.keys(game.players))
+    removed = MapSet.difference(previous_ids, ids)
+    revision = System.unique_integer([:monotonic, :positive])
+    players = Enum.map(game.players, fn {id, player} -> {{:player, id}, player} end)
+
+    squares =
+      for {square, entities} <- FogOfWarFrontier.Game.Map.square_entities(game),
+          do: {{:square, square}, entities}
+
+    # Tombstones make removals visible in the same atomic insert as the new revision.
+    tombstones = for id <- removed, do: {{:player, id}, nil}
 
     :ets.insert(table, [
       {:snapshot, game},
-      {:views, views}
-      | Enum.map(game.players, fn {id, player} -> {{:player, id}, player} end)
+      {:views, views},
+      {:player_ids, ids},
+      {:view_clock, {revision, game.tick, Map.get(game, :paused, false)}}
+      | players ++ squares ++ tombstones
     ])
+
+    Enum.each(removed, &:ets.delete(table, {:player, &1}))
+  end
+
+  defp previous_player_ids(table) do
+    case :ets.lookup(table, :snapshot) do
+      [{:snapshot, game}] -> MapSet.new(Map.keys(game.players))
+      [] -> MapSet.new()
+    end
   end
 end

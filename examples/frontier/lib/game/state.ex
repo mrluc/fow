@@ -12,6 +12,8 @@ defmodule FogOfWarFrontier.Game.State do
               position: {3, 3},
               last_move_tick: 0,
               mode: :idle,
+              health: Rules.monster_health(),
+              respawn_tick: nil,
               decision_tick: 0
             }
 
@@ -117,6 +119,45 @@ defmodule FogOfWarFrontier.Game.State do
     end
   end
 
+  def dispatch(state, {:attack, id, :monster}) do
+    target = Map.put_new(state.monster, :health, Rules.monster_health())
+
+    with %Player{} = player <- state.players[id],
+         {:ok, attacker} <- Player.prepare_attack(player, target, state.tick) do
+      health = max(0, target.health - Rules.attack_damage())
+      defeated = health == 0
+
+      monster =
+        if defeated do
+          Map.merge(target, %{
+            health: 0,
+            mode: :banished,
+            respawn_tick: state.tick + Rules.monster_respawn_ticks()
+          })
+        else
+          %{target | health: health}
+        end
+
+      attacker =
+        if defeated,
+          do: Player.record_kill(%{attacker | lives: attacker.lives + 1}, :monster_kills),
+          else: attacker
+
+      %{state | monster: monster, players: Map.put(state.players, id, attacker)}
+      |> event(%{
+        player: id,
+        action: :attack,
+        target: :monster,
+        result: :ok,
+        position: player.position,
+        defeated: defeated
+      })
+    else
+      {:error, reason} -> reject(state, id, :attack, reason)
+      nil -> reject(state, id, :attack, :unknown_player)
+    end
+  end
+
   def dispatch(state, {:attack, id, target_id}) do
     with %Player{} = player <- state.players[id],
          %Player{} = target <- state.players[target_id],
@@ -148,6 +189,28 @@ defmodule FogOfWarFrontier.Game.State do
 
   if Mix.env() == :test do
     defp walk_monster(%{monster: %{mode: :disabled}} = state), do: state
+  end
+
+  defp walk_monster(%{monster: %{mode: :banished, respawn_tick: ready}} = state) do
+    if state.tick >= ready do
+      {lat, lon} = state.monster.position
+      {offset, random} = :rand.uniform_s(15, state.random)
+      square = rem(lat * 4 + lon + offset, 16)
+
+      monster = %{
+        state.monster
+        | position: {div(square, 4), rem(square, 4)},
+          health: Rules.monster_health(),
+          mode: :idle,
+          last_move_tick: state.tick,
+          decision_tick: state.tick,
+          respawn_tick: nil
+      }
+
+      event(%{state | monster: monster, random: random}, %{action: :monster_respawn, result: :ok})
+    else
+      state
+    end
   end
 
   defp walk_monster(state) do

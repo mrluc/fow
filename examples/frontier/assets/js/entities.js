@@ -47,11 +47,13 @@ export const FrontierEntities = {
 }
 
 function depart({copy, rect}) {
+  if (copy.classList.contains('monster-banished')) return
   copy.classList.add('entity-departure')
   Object.assign(copy.style, {
     position: 'fixed', left: rect.x + 'px', top: rect.y + 'px', width: rect.width + 'px',
     height: rect.height + 'px', margin: '0', zIndex: '3', pointerEvents: 'none',
   })
+  copy.inert = true
   copy.setAttribute('aria-hidden', 'true')
   document.body.append(copy)
   copy.animate([

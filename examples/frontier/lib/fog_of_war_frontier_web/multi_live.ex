@@ -3,6 +3,8 @@ defmodule FogOfWarFrontierWeb.MultiLive do
   alias FogOfWarFrontier.Game
   alias FogOfWarFrontier.Game.Map, as: GameMap
 
+  @gc_interval_ticks 200
+
   def mount(_, session, socket) do
     connection = if connected?(socket), do: get_connect_info(socket, :session), else: nil
     server = Map.get(session, "game_server", Game)
@@ -43,7 +45,7 @@ defmodule FogOfWarFrontierWeb.MultiLive do
          true <- lat in 0..3 and lon in 0..3 do
       fresh_join =
         connected?(socket) && socket.assigns.player_id &&
-          is_nil(read(socket.assigns.game_server).players[socket.assigns.player_id])
+          is_nil(read_player(socket.assigns.game_server, socket.assigns.player_id))
 
       socket =
         if fresh_join, do: assign(socket, acknowledged_life: -1, fresh_join: true), else: socket
@@ -59,6 +61,11 @@ defmodule FogOfWarFrontierWeb.MultiLive do
         else
           read(socket.assigns.game_server)
         end
+
+      socket =
+        if connected?(socket) && !Map.has_key?(socket.private, :frontier_gc),
+          do: put_private(socket, :frontier_gc, {game.tick, 0}),
+          else: socket
 
       player = game.players[socket.assigns.player_id]
 
@@ -100,16 +107,15 @@ defmodule FogOfWarFrontierWeb.MultiLive do
     Phoenix.PubSub.broadcast(
       FogOfWarFrontier.PubSub,
       LiveMemory.topic(socket.assigns.game_server),
-      {:live_memory, LiveMemory.sample(socket.assigns.player_id)}
+      {:live_memory, LiveMemory.sample(socket.assigns.player_id, socket.transport_pid)}
     )
 
     Process.send_after(self(), :report_memory, 1000)
     {:noreply, socket}
   end
 
-  def handle_info({:game_tick, server, _}, %{assigns: %{game_server: server}} = socket) do
-    game = read(server)
-    socket = refresh_game(socket, game)
+  def handle_info({:game_tick, server, tick}, %{assigns: %{game_server: server}} = socket) do
+    socket = socket |> schedule_gc(tick) |> refresh_view()
     player = socket.assigns.player_state
 
     socket =
@@ -124,9 +130,37 @@ defmodule FogOfWarFrontierWeb.MultiLive do
     {:noreply, socket}
   end
 
+  def handle_info({:garbage_collect, :frontier_gc, _result}, socket), do: {:noreply, socket}
+
+  def handle_info({:monster_attack, server, attack}, %{assigns: %{game_server: server}} = socket) do
+    if attack.position == {socket.assigns.lat, socket.assigns.lon} do
+      sprite_id =
+        if attack.player == socket.assigns.player_id,
+          do: "player",
+          else: "entities-player-#{attack.player}"
+
+      {:noreply,
+       push_event(socket, "frontier:elixir_strike", %{
+         sprite_id: sprite_id,
+         defeated: attack.defeated,
+         slayer: attack.defeated && attack.player == socket.assigns.player_id
+       })}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("attack_monster", _, socket) do
+    if socket.assigns.player_id && is_nil(socket.assigns.respawn_pending) do
+      game = Game.act(socket.assigns.game_server, {:attack, socket.assigns.player_id, :monster})
+      {:noreply, refresh_game(socket, game)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_event("sync_player", _, socket) do
-    {:noreply,
-     socket |> assign(player_status: nil) |> refresh_game(read(socket.assigns.game_server))}
+    {:noreply, socket |> assign(player_status: nil) |> refresh_view()}
   end
 
   def handle_event("respawn_ready", %{"life" => life} = params, socket) do
@@ -164,9 +198,40 @@ defmodule FogOfWarFrontierWeb.MultiLive do
   defp read(Game), do: GameMap.snapshot()
   defp read(server), do: Game.snapshot(server)
 
-  defp refresh_game(socket, game) do
-    player = game.players[socket.assigns.player_id]
+  defp schedule_gc(socket, tick) do
+    {previous, elapsed} = Map.get(socket.private, :frontier_gc, {tick, 0})
 
+    # Actions can publish the same tick again, and a game reset restarts the clock.
+    elapsed = elapsed + if(tick >= previous, do: tick - previous, else: tick)
+
+    if elapsed >= @gc_interval_ticks do
+      :erlang.garbage_collect(self(), async: :frontier_gc)
+      :erlang.garbage_collect(socket.transport_pid, async: :frontier_gc)
+    end
+
+    put_private(socket, :frontier_gc, {tick, rem(elapsed, @gc_interval_ticks)})
+  end
+
+  defp read_player(Game, id), do: GameMap.player(id)
+  defp read_player(server, id), do: read(server).players[id]
+
+  defp refresh_view(%{assigns: %{game_server: Game} = assigns} = socket) do
+    view = GameMap.view(assigns.player_id, {assigns.lat, assigns.lon})
+    refresh_projection(socket, view)
+  end
+
+  defp refresh_view(socket), do: refresh_game(socket, read(socket.assigns.game_server))
+
+  defp refresh_game(%{assigns: assigns} = socket, game) do
+    refresh_projection(socket, %{
+      player: game.players[assigns.player_id],
+      tick: game.tick,
+      paused: Map.get(game, :paused, false),
+      entities: GameMap.entities(game, {assigns.lat, assigns.lon}, assigns.player_id)
+    })
+  end
+
+  defp refresh_projection(socket, %{player: player} = view) do
     socket =
       if connected?(socket) && player && player.life > socket.assigns.acknowledged_life &&
            socket.assigns.respawn_pending != player.life do
@@ -187,8 +252,9 @@ defmodule FogOfWarFrontierWeb.MultiLive do
     socket =
       if player && connected?(socket) do
         status = %{
-          paused: Map.get(game, :paused, false),
+          paused: view.paused,
           health: player.health,
+          last_attack_tick: player.last_attack_tick,
           clearing_cache: not is_nil(socket.assigns.respawn_pending),
           dead: player.health <= 0,
           life: player.life,
@@ -196,11 +262,11 @@ defmodule FogOfWarFrontierWeb.MultiLive do
           respawn_remaining_ms:
             if(player.death_tick,
               do:
-                max(0, player.death_tick + Game.Rules.respawn_ticks() - game.tick) *
+                max(0, player.death_tick + Game.Rules.respawn_ticks() - view.tick) *
                   Game.Rules.tick_ms(),
               else: 0
             ),
-          move_remaining_ms: max(0, player.charge_ready_tick - game.tick) * Game.Rules.tick_ms()
+          move_remaining_ms: max(0, player.charge_ready_tick - view.tick) * Game.Rules.tick_ms()
         }
 
         if status != socket.assigns.player_status do
@@ -215,8 +281,7 @@ defmodule FogOfWarFrontierWeb.MultiLive do
     if socket.assigns.respawn_pending do
       socket
     else
-      entities =
-        GameMap.entities(game, {socket.assigns.lat, socket.assigns.lon}, socket.assigns.player_id)
+      entities = view.entities
 
       previous = socket.assigns.entities_by_id
       current = Map.new(entities, &{&1.id, &1})

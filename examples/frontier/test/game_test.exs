@@ -63,6 +63,30 @@ defmodule FogOfWarFrontier.GameTest do
     assert GameMap.player(id) == nil
   end
 
+  test "the ETS view follows square changes while retaining the local player's position" do
+    server = :frontier_square_projection_test
+    start_supervised!({Game, name: server, automatic: false})
+    table = :sys.get_state(server).table
+    Game.act(server, {:connect, "viewer", {0, 0}})
+    Game.act(server, {:connect, "neighbor", {0, 0}})
+    Game.act(server, {:connect, "elsewhere", {3, 3}})
+
+    assert %{tick: 0, paused: false, entities: [%{id: "player-neighbor"}]} =
+             GameMap.view("viewer", {0, 0}, table)
+
+    Game.act(server, {:move, "neighbor", {0, 1}})
+    assert %{tick: 0, entities: []} = GameMap.view("viewer", {0, 0}, table)
+
+    assert %{player: %{position: {0, 0}}, entities: [%{id: "player-neighbor"}]} =
+             GameMap.view("viewer", {0, 1}, table)
+
+    Game.pause(server)
+    assert %{tick: 0, paused: true} = GameMap.view("viewer", {0, 1}, table)
+
+    assert %{entities: [%{kind: :monster}, %{id: "player-elsewhere"}]} =
+             GameMap.view("viewer", {3, 3}, table)
+  end
+
   test "expiration removes the player's ETS record as well as the snapshot" do
     server = :frontier_expiry_test
     start_supervised!({Game, name: server, automatic: false})
@@ -73,6 +97,7 @@ defmodule FogOfWarFrontier.GameTest do
     for _ <- 1..1200, do: Game.step(server)
     assert :ets.lookup(table, {:player, "expired"}) == []
     refute Map.has_key?(Game.snapshot(server).players, "expired")
+    assert %{player: nil, entities: []} = GameMap.view("expired", {0, 0}, table)
   end
 
   test "an automatic game keeps ticking across actions and reads" do

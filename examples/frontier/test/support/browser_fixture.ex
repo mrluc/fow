@@ -8,7 +8,13 @@ defmodule FogOfWarFrontierWeb.BrowserFixture do
       when mode in ["disable", "enable"] do
     if Application.get_env(:fog_of_war_frontier, :browser_fixtures, false) do
       mode = if mode == "disable", do: :disabled, else: :idle
-      :sys.replace_state(Game, fn state -> put_in(state.game.monster.mode, mode) end)
+
+      :sys.replace_state(Game, fn state ->
+        if state.game.monster.mode == :banished,
+          do: state,
+          else: put_in(state.game.monster.mode, mode)
+      end)
+
       conn |> send_resp(204, "") |> halt()
     else
       conn

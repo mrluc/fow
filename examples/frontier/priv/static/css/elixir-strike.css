@@ -1,0 +1,73 @@
+#player { --elixir-walk-frame: url('/images/scout-walk.png'); }
+.entity-player { --elixir-walk-frame: url('/images/scout/256/scout-walk.png'); }
+
+/* Neighboring tile hit areas can overlap the beast's upper body. */
+#map-scene:has(#multi-entities) .travel-layer { z-index: 4; }
+
+#multi-entities button.entity-monster {
+  border: 0;
+  padding: 0;
+  background-color: transparent;
+  color: inherit;
+  pointer-events: none;
+}
+
+#multi-entities button.entity-monster::after {
+  content: '';
+  position: absolute;
+  inset: 12% 19% 14%;
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.fow-offline #multi-entities button.entity-monster::after,
+.frontier-dead #multi-entities button.entity-monster::after,
+.frontier-paused #multi-entities button.entity-monster::after {
+  pointer-events: none;
+}
+
+#multi-entities button.entity-monster:focus-visible {
+  outline: 2px solid #e4a4ff;
+  outline-offset: -8px;
+}
+
+#elixir-effects {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.elixir-effect {
+  position: absolute;
+  overflow: visible;
+  transform-origin: 0 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.elixir-ground { z-index: 2; }
+.elixir-beam { filter: drop-shadow(0 0 9px #a739ff); }
+
+#multi-entities .entity-monster {
+  --beast-idle: url('/images/monster/256/monster-idle.png');
+  --beast-kneel: url('/images/monster/256/monster-recompose.png');
+  --beast-puddle: url('/images/monster/256/monster-spread-starfish.png');
+  transform-origin: center 85%;
+}
+
+#multi-entities .monster-banished {
+  animation: none;
+  opacity: 0;
+}
+
+#multi-entities .monster-banished::after { pointer-events: none; }
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  html:not(.fow-offline, .frontier-dead, .frontier-paused) #multi-entities button.entity-monster:enabled {
+    transition: scale 180ms cubic-bezier(.22, 1.65, .48, 1);
+  }
+
+  html:not(.fow-offline, .frontier-dead, .frontier-paused) #multi-entities button.entity-monster:enabled:hover {
+    scale: 1.07;
+  }
+}

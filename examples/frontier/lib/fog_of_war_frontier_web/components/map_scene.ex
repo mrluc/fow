@@ -33,16 +33,20 @@ defmodule FogOfWarFrontierWeb.MapScene do
               class="entity-slot"
               data-health={entity[:health]}
             >
+              <button
+                :if={entity.kind == :monster}
+                type="button"
+                class={["entity-sprite", "entity-monster", "monster-#{entity.mode}"]}
+                phx-click="attack_monster"
+                disabled={entity.mode == :banished}
+                aria-label="Attack the Split Brain beast"
+                title={"Attack · #{entity.health} HP"}
+              ></button>
               <span
-                class={[
-                  "entity-sprite",
-                  "entity-#{entity.kind}",
-                  entity[:mode] && "monster-#{entity.mode}"
-                ]}
+                :if={entity.kind == :player}
+                class="entity-sprite entity-player"
                 role="img"
-                aria-label={
-                  if entity.kind == :monster, do: "Split Brain beast", else: "Another player"
-                }
+                aria-label="Another player"
               ></span>
             </span>
           </div>
@@ -53,6 +57,7 @@ defmodule FogOfWarFrontierWeb.MapScene do
             class={"scout at-#{@lat}-#{@lon}"}
             aria-label="Your scout"
           ></span>
+          <div :if={@multiplayer} id="elixir-effects" phx-update="ignore" aria-hidden="true"></div>
           <nav class="travel-layer" aria-label="Travel to a neighboring tile">
             <.link
               :for={{lat, lon} <- @neighbors}
@@ -65,7 +70,13 @@ defmodule FogOfWarFrontierWeb.MapScene do
         </div>
       </main>
     </FogOfWar.region>
-    <FogOfWar.dev_tools socket={@socket} enabled={true} dock="bottom-right" semi_transparent={true} scale={1.1} />
+    <FogOfWar.dev_tools
+      socket={@socket}
+      enabled={true}
+      dock="bottom-right"
+      semi_transparent={true}
+      scale={1.1}
+    />
     """
   end
 end
