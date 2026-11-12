@@ -8,7 +8,12 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   let lastStatus = null
   const navigationEvents = []
   const navigationSubscribers = new Set()
-  let nextEvent = 0, liveAttempt = null
+  let nextEvent = 0, liveAttempt = null, navigationTimer = null
+  const redirect = liveSocket.redirect.bind(liveSocket)
+  liveSocket.redirect = (to, ...args) => {
+    if (snapshotMode && to === location.href) return
+    return redirect(to, ...args)
+  }
   const recordNavigation = (url, source) => {
     let cached = false
     try { cached = Boolean(cache.find(url)) } catch (_) { /* Logging must not break navigation. */ }
@@ -32,8 +37,19 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     if (liveAttempt?.path === url.pathname + url.search + url.hash) return
     if (liveAttempt) finishNavigation(liveAttempt, 'superseded')
     liveAttempt = recordNavigation(url, 'LiveView')
+    const attempt = liveAttempt
+    clearTimeout(navigationTimer)
+    navigationTimer = setTimeout(async () => {
+      if (liveAttempt !== attempt || offline() || !cache.find(url)) return
+      unavailable = true
+      finishNavigation(attempt, 'superseded', 'Navigation stalled; showing cached page.')
+      liveAttempt = null
+      await navigate(url)
+      refresh()
+    }, 1200)
   })
   window.addEventListener('phx:page-loading-stop', () => {
+    clearTimeout(navigationTimer)
     cache.protect(location.pathname)
     if (liveAttempt && !offline()) {
       liveAttempt.path = location.pathname + location.search + location.hash

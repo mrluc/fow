@@ -53,6 +53,10 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .fow-offline .fow-nav.fow-nav-uncached { opacity: .4; cursor: not-allowed; }
 .fow-offline .counter-card button { opacity: .4; cursor: not-allowed; }
 
+/* LiveView marks the link while its navigation is waiting for a response. */
+.fow-nav.phx-click-loading { animation: navigation-wait .55s ease-in-out infinite alternate; }
+@keyframes navigation-wait { from { opacity: 1; } to { opacity: .35; } }
+
 /* Only the page content moves. Header and floating developer tools stay still. */
 .site-content { view-transition-name: counter-content; }
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
@@ -64,5 +68,6 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 @keyframes counter-in { from { opacity: 0; transform: translateX(var(--page-travel)); } }
 @keyframes counter-out { to { opacity: 0; transform: translateX(calc(-1 * var(--page-travel))); } }
 @media (prefers-reduced-motion: reduce) {
+  .fow-nav.phx-click-loading { animation: none; opacity: .6; }
   ::view-transition-group(*) { animation-duration: 0s !important; }
 }
