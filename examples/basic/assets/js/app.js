@@ -12,3 +12,13 @@ const fogOfWar = installFogOfWar(liveSocket, {transition: transitions.navigate})
 liveSocket.connect()
 window.liveSocket = liveSocket
 window.fogOfWar = fogOfWar
+
+
+// The demo ends the Phoenix session only after FoW confirms the key is gone.
+window.addEventListener("fog-of-war:account-locked", async () => {
+  const response = await fetch("/demo/logout", {
+    method: "DELETE",
+    headers: {"x-csrf-token": csrfToken},
+  })
+  if (response.ok) location.assign("/")
+})

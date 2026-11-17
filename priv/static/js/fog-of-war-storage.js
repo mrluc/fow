@@ -11,7 +11,7 @@ const done = transaction => new Promise((resolve,reject) => {
   transaction.onerror = () => {} // onabort reports the final transaction result.
 })
 
-export async function openIndexedDBStore() {
+export async function openIndexedDBStore({protectedAccounts = false} = {}) {
   const db = await new Promise((resolve,reject) => {
     let abandoned = false
     const request = indexedDB.open(DATABASE,1)
@@ -60,18 +60,75 @@ export async function openIndexedDBStore() {
     throw error
   })
 
+  const readSetting = async id => {
+    const tx = db.transaction('imports'), complete = done(tx)
+    const [value] = await Promise.all([requestResult(tx.objectStore('imports').get(id)), complete])
+    return value
+  }
+  const account = () => readSetting('active-account')
+  const setAccount = async (value, expected) => {
+    const tx = db.transaction(['imports', 'pages', 'metadata'], 'readwrite'), complete = done(tx)
+    const settings = tx.objectStore('imports')
+    const current = settings.get('active-account')
+    let applied = false
+    current.onsuccess = () => {
+      if (expected !== undefined && (current.result?.revision || null) !== expected) return
+      settings.put({id: 'active-account', ...value, revision: crypto.randomUUID()})
+      applied = true
+      if (!value.key) return
+      const cursor = tx.objectStore('metadata').openCursor()
+      cursor.onsuccess = () => {
+        const row = cursor.result
+        if (!row) return
+        if (row.value.snapshot?.userId && !row.value.snapshot.accountProtected) {
+          tx.objectStore('pages').delete(row.primaryKey)
+          row.delete()
+        }
+        row.continue()
+      }
+    }
+    await complete
+    return applied
+  }
+
   return {
     kind:'indexedDB',
+    account, setAccount,
+    enableAccountProtection() { protectedAccounts = true },
+    async deviceId() {
+      const tx = db.transaction('imports', 'readwrite'), complete = done(tx)
+      const settings = tx.objectStore('imports')
+      const request = settings.get('account-device-id')
+      let value
+      request.onsuccess = () => {
+        value = request.result?.value || crypto.randomUUID()
+        if (!request.result) settings.add({id: 'account-device-id', value})
+      }
+      await complete
+      return value
+    },
     async list() { const tx=db.transaction('metadata');const complete=done(tx);const [result]=await Promise.all([requestResult(tx.objectStore('metadata').getAll()),complete]);return result.map(row => ({...row, path: row.snapshot.path})) },
     async get(path) { const tx=db.transaction('pages');const complete=done(tx);const [result]=await Promise.all([requestResult(tx.objectStore('pages').get(path)),complete]);if (!result) return null
       const record = {...result, path: result.route || result.path}
+      if (record.userId && (protectedAccounts || record.accountProtected)) {
+        if (!protectedAccounts || !record.accountProtected) return null
+        const active = await account()
+        if (!active?.key || active.userId !== record.userId) return null
+        const decoded = await openSnapshot(record, active.key)
+        return active.revision === (await account())?.revision
+          ? {...decoded, accountRevision: active.revision} : null
+      }
       return record.htmlEncoding === 'gzip-aes-gcm' ? openSnapshot(record, await key()) : record },
     async progress(id) { const tx=db.transaction('imports');const complete=done(tx);const [result]=await Promise.all([requestResult(tx.objectStore('imports').get(id)),complete]);return result },
     async write(records,{replace=()=>true,progress}={}) {
-      if (records.some(record => record.htmlEncoding === 'gzip')) {
-        const encryptionKey = await key()
-        records = await Promise.all(records.map(record => sealSnapshot(record, encryptionKey)))
-      }
+      const active = protectedAccounts && records.some(record => record.userId) ? await account() : null
+      records = (await Promise.all(records.map(async record => {
+        if (protectedAccounts && record.userId) {
+          if (!active?.key || active.userId !== record.userId) return null
+          return sealSnapshot({...record, accountProtected: true}, active.key)
+        }
+        return record.htmlEncoding === 'gzip' ? sealSnapshot(record, await key()) : record
+      }))).filter(Boolean)
       const tx=db.transaction(['pages','metadata','imports'],'readwrite'),complete=done(tx)
       const pages=tx.objectStore('pages'), metadata=tx.objectStore('metadata'),stored=[],skipped=[]
       let writeError
@@ -79,12 +136,16 @@ export async function openIndexedDBStore() {
         for(const record of records) {
           const key=recordKey(record.path, record.userId)
           const request=pages.get(key)
-          request.onsuccess=()=>{
+          const slot = record.accountProtected ? tx.objectStore('imports').get('active-account') : null
+          const write = () => {
+            if (slot && slot.result?.revision !== active.revision) return
             try {
               if(!replace(request.result,record)){skipped.push(record.path);return}
               pages.put({...record,path:key,route:record.path});metadata.put({...describeRecord(record),path:key});stored.push(record.path)
             }catch(error){writeError=error;tx.abort()}
           }
+          if (slot) slot.onsuccess = write
+          else request.onsuccess = write
         }
         if(progress) {
           const state=tx.objectStore('imports'),request=state.get(progress.id)

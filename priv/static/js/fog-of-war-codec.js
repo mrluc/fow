@@ -4,7 +4,7 @@ export const DATABASE = 'fog-of-war'
 export function validSnapshot(record) {
   return Boolean(record && record.schema === 1 && typeof record.path === 'string' && record.path.startsWith('/') &&
     !record.path.startsWith('//') && !/[?#\\\0]/.test(record.path) && Number.isFinite(Date.parse(record.savedAt)) &&
-    (typeof record.html === 'string' || (['gzip', 'gzip-aes-gcm'].includes(record.htmlEncoding) && record.htmlGzip instanceof Uint8Array) ||
+    (typeof record.html === 'string' || (['gzip', 'gzip-aes-gcm', 'plain-aes-gcm'].includes(record.htmlEncoding) && record.htmlGzip instanceof Uint8Array) ||
       (record.htmlEncoding === 'gzip-base64' && typeof record.htmlGzip === 'string')))
 }
 

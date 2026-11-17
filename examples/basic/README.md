@@ -102,3 +102,16 @@ The comparison artifacts from this run are in the repository's ignored `results/
 ## Fly.io
 
 The public demo is at https://fow-counters.fly.dev. Deploy from the repository root with `bin/deploy example basic`. The Fly app needs a `SECRET_KEY_BASE` secret. The machine can stop while idle. The counters share an in-memory Agent, so a machine restart resets them.
+
+
+## Try the shared-browser cache
+
+The demo accepts Bob and Sally without passwords. Log in, open the colored
+greeting to save that account's profile, and use DevTools to try it offline.
+Reconnect and log out, then log in as the other account. The logout control
+clears offline access before ending the Phoenix session. Use the header’s Log in link to reach the dedicated login page. The profile
+requires an authenticated session in both the router and LiveView mount.
+
+Open a counter in two tabs to see updates arrive over PubSub. If your increment
+reaches 100 while signed in, the LiveView sends `fow:logout`. The demo calls its session logout endpoint after FoW confirms the key is gone. Counter values reset
+when the server restarts.

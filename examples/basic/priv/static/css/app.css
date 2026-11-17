@@ -71,3 +71,15 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .fow-nav.phx-click-loading { animation: none; opacity: .6; }
   ::view-transition-group(*) { animation-duration: 0s !important; }
 }
+
+.site-header nav { display: flex; align-items: center; }
+.site-header .all-counters, .profile-name { text-decoration: underline; }
+.profile-name { font-weight: 700; }
+.profile-name.bob { color: #375aa8; }
+.profile-name.sally { color: #9d3168; }
+.counter-greeting { margin: 0; font-size: 1.25rem; }
+.counter-greeting .profile-name { font-style: italic; }
+
+.login-card { max-width: 380px; margin: 0 auto; }
+.login-card form { display: grid; gap: .6rem; }
+.account-button { background: var(--green); color: white; border: 0; border-radius: 7px; padding: .7rem 1rem; font-weight: 650; cursor: pointer; }

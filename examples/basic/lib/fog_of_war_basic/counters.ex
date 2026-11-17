@@ -8,12 +8,21 @@ defmodule FogOfWarBasic.Counters do
   def all, do: Agent.get(__MODULE__, & &1)
   def get(id), do: Agent.get(__MODULE__, &Map.get(&1, id))
 
-  def increment(id),
-    do:
-      Agent.get_and_update(
-        __MODULE__,
-        &{Map.fetch!(&1, id) + 1, Map.update!(&1, id, fn n -> n + 1 end)}
-      )
+  def subscribe(id), do: Phoenix.PubSub.subscribe(FogOfWarBasic.PubSub, topic(id))
+
+  def increment(id) do
+    Agent.get_and_update(__MODULE__, fn counters ->
+      count = Map.fetch!(counters, id) + 1
+
+      for key <- [id, :all] do
+        Phoenix.PubSub.broadcast(FogOfWarBasic.PubSub, topic(key), {:counter_changed, id, count})
+      end
+
+      {count, Map.put(counters, id, count)}
+    end)
+  end
+
+  defp topic(id), do: "counter:#{id}"
 
   def known?(id), do: Map.has_key?(@counters, id)
   def label("one"), do: "Counter one"

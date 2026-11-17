@@ -1,9 +1,111 @@
 defmodule FogOfWar do
   @moduledoc """
-  Adds read-only offline navigation to selected Phoenix LiveView pages.
+  Adds read-only offline navigation to Phoenix LiveView pages.
+  Use via `FogOfWar.region/1`.
 
-  Start with `region/1`. It defines what FoW saves for a route and documents
-  the options that configure the JavaScript capture hook.
+  # Usage
+
+  For a simple public page, where everyone will see the same data,
+  wrap the routed content in a region.
+
+      <FogOfWar.region>
+        <.link navigate={~p"/"}>Back to index</.link>
+        <output>{@detail}</output>
+      </FogOfWar.region>
+
+  Each time they visit that route, it's cached in the browser.
+
+  ## Caching user-specific markup
+  **What about multiple users?** If Bob and Sally
+  used the same open browser, they shouldn't
+  see each other's cached content!
+
+  Use `user_id` to save personalized markup:
+
+      <FogOfWar.region
+        user_id={@current_user && @current_user.id}
+        require_user_id
+      >
+        <h1>Settings</h1>
+        <p>{@current_user && @current_user.email}</p>
+      </FogOfWar.region>
+
+  With cached content in IndexDB encrypted at rest, to
+  prevent low-effort dumping attacks
+  on compromised systems. And when using user-id on a region,
+  users can't see markup cached from other users who may have
+  logged in on the same device.
+
+  However, it is only encrypted with a key that is stored locally.
+  So it is possible that if Bob signs in with the same browser Sally
+  has used, and Bob is either malicious or compromised by something
+  that can execute scripts in his browser and knows about FogOfWar,
+  Sally's data can be exposed.
+
+  The solution is to ensure that when Sally logs out, her key is
+  no longer available. Let's set this up.
+
+  ## Cache security
+
+  To give user-specific markup much stronger security guarantees,
+  you need to take another step.
+
+  To protect private snapshots after logout, enable server-derived account
+  keys. Configure a callback that receives the authenticated connection and
+  returns the same stable string as the region's `user_id`, or `nil` to deny
+  access. Include the tenant when account IDs are tenant-local.
+
+      config :fow, account_key_identity: {MyAppWeb.OfflineIdentity, :account_scope}
+
+  For example, if your authentication plug assigns `current_user`:
+
+      defmodule MyAppWeb.OfflineIdentity do
+        def account_scope(%Plug.Conn{assigns: %{current_user: %{id: id}}}), do: to_string(id)
+        def account_scope(_conn), do: nil
+      end
+
+  Add the built-in endpoint inside your authenticated, CSRF-protected browser
+  scope. Keep this path at the application root.
+
+      post "/_fow/account-key", FogOfWar.AccountKeyEndpoint, []
+
+  FoW reuses the matching key in IndexedDB. If it is missing or belongs to
+  another account, FoW requests a key when a signed-in region renders.
+  There is no separate login call.
+
+  ### Clear the key on logout
+
+  Wrap your existing logout control with `logout/1`. FoW clears the stored
+  account key before forwarding the click or form submission. Phoenix still
+  handles the session and any cross-tab refreshes.
+
+      <FogOfWar.logout>
+        <.link href={~p"/users/log-out"} method="delete">Log out</.link>
+      </FogOfWar.logout>
+
+  A LiveView can also request the same local clear with
+  `push_event(socket, "fow:logout", %{})`. FoW listens even when the page has no
+  region. Let the browser finish the clear before redirecting. If you need
+  completion, listen for the browser event `fog-of-war:account-locked`.
+  Your app still owns the server session. Scripts running while the account
+  is unlocked can read its cached content. See the
+  [upgrade and logout notes](readme.html#optional-account-keys).
+
+  ## Cache expiry
+  To expire the saved copy two hours after its last online capture:
+
+      <FogOfWar.region max_age="PT2H">
+        <h1>Trip details</h1>
+      </FogOfWar.region>
+
+  * ISO 8601 is supported, from Elixir's `Duration` module, like: `PT2H` (two hours), `P7D` (seven days),
+    `P1M` (one month), and `P1Y` (one year, counted as 365 days).
+  * Omit `max_age` to keep snapshots without a time limit. Offline visits do
+    not renew the expiry. Bundled snapshots age from the time of export, so
+    it is probably important that the bottom of your nav tree not have expiry.
+    `Duration` uses 30-day months and 365-day years, and rounds up
+    fractional milliseconds, so don't use this for anything you need to expire
+    at a very precise date/time.
   """
   use Phoenix.Component
 
@@ -29,51 +131,17 @@ defmodule FogOfWar do
 
   Each time they visit that route, it's cached in the browser.
 
-  **What about LiveViews with multiple users, though?** If Bob and Sally
-  used the same open browser to sign in and sign out, they shouldn't
-  see each other's cached content!
-
-  Use `user-id` to save personalized markup:
-
-      <FogOfWar.region
-        user-id={@current_user && @current_user.id}
-        require-user-id
-      >
-        <h1>Settings</h1>
-        <p>{@current_user && @current_user.email}</p>
-      </FogOfWar.region>
-
-  **Note about security:** all markup is encrypted at rest on the client, to
-  prevent low-effort IndexDB dumping style attacks, but it's not
-  currently encrypted by a secret the *server* provides. So Bob and
-  Sally, using the same browser and logging in and out, are not safe
-  from each other! You can find the client secret and dump the other
-  user's markup from a JS script in console.
-  * In practice, as long as you know this, you can take it into account.
-  * In the future, we will support a server provided per-user-device key,
-    so a logged-out user's data is impenetrable to another user in this scenario.
-    Since a login / logout usually requires the server anyway, this would be a natural
-    place to refresh that.
-  * However, this is relatively low priority. Why? Because an attack assumes
-    users on the same device, or a remote compromise with the ability to eg.
-    inject scripts into the browser. That's a lot of access, a lot worse
-    things are likely possible on most people's computers / browsers, and it does
-    require targeting this library, since bulk dumping only gives
-    encrypted blobs.
-  * Still, until harder guarantees exist, it may be good not to risk caching eg.
-    sensitive information *at all* in the browser. Or, the offline mode
-    could be opt-in to the users, letting them know that another user of
-    the device, if compromised, could read their cached offline data.
+  For account scoping and logout setup, see the module’s cache security guide.
 
   To expire the saved copy two hours after its last online capture:
 
-      <FogOfWar.region max-age="PT2H">
+      <FogOfWar.region max_age="PT2H">
         <h1>Trip details</h1>
       </FogOfWar.region>
 
   * ISO 8601 is supported, from Elixir's `Duration` module, like: `PT2H` (two hours), `P7D` (seven days),
     `P1M` (one month), and `P1Y` (one year, counted as 365 days).
-  * Omit `max-age` to keep snapshots without a time limit. Offline visits do
+  * Omit `max_age` to keep snapshots without a time limit. Offline visits do
     not renew the expiry. Bundled snapshots age from the time of export, so
     it is probably important that the bottom of your nav tree not have expiry.
     `Duration` uses 30-day months and 365-day years, and rounds up
@@ -90,10 +158,10 @@ defmodule FogOfWar do
         <output>{@count}</output>
       </main>
 
-  The component passes `path`, `user-id`, and `require-user-id` to the hook
+  The component passes `path`, `user_id`, and `require_user_id` to the hook
   as: `data-fog-of-war-path`, `data-fog-of-war-user-id`, and
   `data-fog-of-war-require-user-id="true"`. It passes the converted
-  `max-age` as `data-fog-of-war-max-age-ms`.
+  `max_age` as `data-fog-of-war-max-age-ms`.
 
   Note about path: FoW normally uses the committed browser pathname.
   The default is to leave `path` unset for a LiveView that can appear at multiple URLs.
@@ -136,7 +204,7 @@ defmodule FogOfWar do
     assigns = assign(assigns, :max_age_ms, max_age_ms!(assigns.max_age))
 
     ~H"""
-    <section id={@id} phx-hook="FogOfWar" data-fog-of-war-max-age-ms={@max_age_ms} data-fog-of-war-path={@path} data-fog-of-war-user-id={@user_id} data-fog-of-war-require-user-id={if @require_user_id, do: "true"} class={@class} {@rest}>
+    <section id={@id} phx-hook="FogOfWar" data-fog-of-war-account-keys={if Application.get_env(:fow, :account_key_identity), do: "true"} data-fog-of-war-max-age-ms={@max_age_ms} data-fog-of-war-path={@path} data-fog-of-war-user-id={@user_id} data-fog-of-war-require-user-id={if @require_user_id, do: "true"} class={@class} {@rest}>
       {render_slot(@inner_block)}
     </section>
     """
@@ -234,6 +302,30 @@ defmodule FogOfWar do
     """
   end
 
+  @doc """
+  Clears the offline account key before activating the enclosed logout control.
+
+  Wrap only the logout link, button, or dedicated logout form. Use an ordinary
+  same-tab link, a native button with `phx-click`, or a form. To cover keyboard
+  form submission, wrap the whole form. FoW forwards the original control
+  after clearing the key so the application's existing logout handler runs.
+  Place the wrapper outside any region that can be rendered offline.
+
+  Use a distinct `id` for each wrapper if the page has more than one.
+  """
+  attr(:id, :string, default: "fog-of-war-logout")
+  attr(:rest, :global)
+  slot(:inner_block, required: true)
+
+  def logout(assigns) do
+    ~H"""
+    <div id={@id} phx-hook="FogOfWarLogout" {@rest}>
+      {render_slot(@inner_block)}
+      <span data-fow-logout-status role="alert"></span>
+    </div>
+    """
+  end
+
   @doc "Directory containing the package's JavaScript entry and supporting modules."
   def assets_path, do: Application.app_dir(:fow, "priv/static/js")
 end
@@ -241,6 +333,7 @@ end
 defmodule FoW do
   @moduledoc "Short module alias for `FogOfWar`."
   defdelegate region(assigns), to: FogOfWar
+  defdelegate logout(assigns), to: FogOfWar
   defdelegate assets_path(), to: FogOfWar
   defdelegate dev_tools(assigns), to: FogOfWar
 end

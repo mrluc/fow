@@ -2,8 +2,8 @@ import {presentSavedPage} from './fog-of-war-presenter'
 import {isExpired} from './fog-of-war-codec'
 import {createFogOfWarCache} from './fog-of-war-cache'
 
-export function installFogOfWarCoordinator(liveSocket, build, {transition = update => update()} = {}) {
-  const cache = createFogOfWarCache(build)
+export function installFogOfWarCoordinator(liveSocket, build, {transition = update => update(), accountKeyEndpoint} = {}) {
+  const cache = createFogOfWarCache(build, {accountKeyEndpoint})
   const subscribers = new Set()
   const devTools = new Set()
   let lastStatus = null
@@ -164,7 +164,8 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
       return false
     }
     // Construct/validate the presentation before changing the URL.
-    await transition(() => {
+    await transition(async () => {
+      if (!await cache.canPresent(snapshot)) return
       if (identityVersion !== cache.identityVersion() || isExpired(snapshot)) return
       if (!snapshotMode) enterSnapshotMode()
       presentSavedPage(outlet, snapshot)
@@ -266,6 +267,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   refresh()
   return {
     cache, toggleConnection,
+    unlockAccount: cache.unlockAccount, lockAccount: cache.lockAccount,
     navigationEvents: () => navigationEvents.map(item => ({...item})),
     subscribeNavigations(fn) { navigationSubscribers.add(fn); return () => navigationSubscribers.delete(fn) },
     clearNavigations() { navigationEvents.length = 0; navigationSubscribers.forEach(fn => fn()) },

@@ -117,7 +117,7 @@ defmodule MyAppWeb.NotesLive do
 
   def render(assigns) do
     ~H"""
-    <FogOfWar.region max-age="PT2H">
+    <FogOfWar.region max_age="PT2H">
       <nav>
         <.link navigate={~p"/counter"}>Counter</.link>
         <.link navigate={~p"/notes"}>Notes</.link>
@@ -138,7 +138,7 @@ Visit both pages while connected. When disconnected, their links and browser Bac
 ### Region options
 
 Use `FogOfWar.region/1` to configure the capture hook. In the Notes example,
-`max-age="PT2H"` makes the saved page expire two hours after its last online capture.
+`max_age="PT2H"` makes the saved page expire two hours after its last online capture.
 ISO 8601 examples include `PT2H` (two hours), `P7D` (seven days),
 `P1M` (one month), and `P1Y` (one year, counted as 365 days).
 
@@ -152,7 +152,7 @@ browser URL. `FogOfWar.region` takes optional attributes such as an explicit
 supports same-origin paths without query strings.
 
 ```heex
-<FogOfWar.region user-id={@current_user && @current_user.id} require-user-id>
+<FogOfWar.region user_id={@current_user && @current_user.id} require_user_id>
   ...
 </FogOfWar.region>
 ```
@@ -160,7 +160,7 @@ supports same-origin paths without query strings.
 Use a stable server-assigned ID (including the tenant if needed). A region with
 an ID saves only to that account. Offline lookups check the active account first,
 then the public cache. An omitted ID saves publicly by default. Set
-`require-user-id` to skip capture when the ID is missing. Bundled routes are
+`require_user_id` to skip capture when the ID is missing. Bundled routes are
 public, and the exporter rejects account-scoped regions.
 
 Account scoping controls normal cache lookup. New gzip payloads written to IndexedDB use AES-GCM with a shared,
@@ -177,6 +177,23 @@ signed-in HTML without scoping, clear that old cache before enabling this featur
 - A region with a user ID saves to that account. Offline lookup checks the active account first, then public snapshots. Bundled routes are public.
 
 Use the developer tools below to inspect saved pages, storage usage, and navigation events.
+
+### Optional account keys
+
+See [Cache security](FogOfWar.html#module-cache-security) for the config
+entry and authenticated router line that enable FoW's built-in endpoint.
+The callback takes a connection and returns the trusted account scope.
+FoW requests the key automatically when a signed-in region renders.
+
+Wrap your existing logout link, button, or form with `FogOfWar.logout/1`.
+FoW clears the shared key before forwarding the action. Phoenix handles
+session logout and any page refreshes.
+
+Clear existing private FoW snapshots before rolling out the new policy,
+including any copies made by older tabs that are still open. The first
+successful unlock also removes old private snapshots from the available
+storage. If rolling back, wipe FoW browser storage before using the previous
+policy again. Public bundles use the same format in either mode.
 
 ## Developer tools
 

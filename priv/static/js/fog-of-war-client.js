@@ -1,3 +1,4 @@
+import {createLogoutHook} from "./fog-of-war-logout"
 import {installFogOfWarCoordinator} from "./fog-of-war-coordinator"
 import {createDevToolsHook} from "./fog-of-war-dev-tools"
 // Maintained extension seam: upstream LiveView stays pinned by demo/mix.lock.
@@ -7,8 +8,21 @@ let coordinator
 export {createFogOfWarTransitions} from "./fog-of-war-transitions"
 export function installFogOfWar(liveSocket, options = {}) {
   if (coordinator) return coordinator
-  coordinator = installFogOfWarCoordinator(liveSocket, FOG_OF_WAR_BUILD, options)
+  const managedKeys = Boolean(document.querySelector('[data-fog-of-war-account-keys="true"]'))
+  coordinator = installFogOfWarCoordinator(liveSocket, FOG_OF_WAR_BUILD, {
+    ...(managedKeys ? {accountKeyEndpoint: '/_fow/account-key'} : {}),
+    ...options,
+  })
   liveSocket.hooks.FogOfWarDevTools = createDevToolsHook(coordinator)
+  liveSocket.hooks.FogOfWarLogout = createLogoutHook(coordinator.lockAccount)
+  window.addEventListener('phx:fow:logout', async () => {
+    try {
+      await coordinator.lockAccount()
+      window.dispatchEvent(new CustomEvent('fog-of-war:account-locked'))
+    } catch (error) {
+      console.error('[FogOfWar] Could not clear the account key', error)
+    }
+  })
   const bundle = window.__fogOfWarNativeBundle
   if (bundle) {
     const readAsset = window.__fogOfWarNativeReadAsset
@@ -62,6 +76,10 @@ export const FogOfWar = {
       html: this.el.outerHTML,
     }
     try {
+      if (userId && this.el.dataset.fogOfWarAccountKeys === 'true' &&
+          !await coordinator.cache.ensureAccount(userId)) return
+      if (!this.el.isConnected || !coordinator.canCapture() ||
+          (this.el.dataset.fogOfWarUserId?.trim() || null) !== userId) return
       await coordinator.cache.save(snapshot)
       if (coordinator.cache.find(new URL(path, location.href))?.savedAt === snapshot.savedAt) {
         const preview = document.getElementById("snapshot-source")

@@ -3,7 +3,11 @@ import {openIndexedDBStore, openLocalStore, openMemoryStore, localRecords} from 
 import {importBundle} from './fog-of-war-import'
 const OPEN='fog-of-war:open:',MAINTENANCE='fog-of-war:cache-maintenance'
 
-export function createFogOfWarCache(build) {
+export function createFogOfWarCache(build, {accountKeyEndpoint} = {}) {
+  let protectedAccounts = Boolean(accountKeyEndpoint)
+  const unlocks = new Map()
+  let signingOut = false
+  let identityKnown = false, accountHint = null
   let currentPath=location.pathname,heldPath,releasePath,lockError=null,store,index=new Map(),writes=Promise.resolve(),protection=Promise.resolve(),storageReason=''
   let userId = null, identityVersion = 0
   const locks=navigator.locks,supported=Boolean(locks?.request&&locks?.query),listeners=new Set()
@@ -12,7 +16,10 @@ export function createFogOfWarCache(build) {
   const compatible=record=>validMetadata(record)&&record.build===build&&!isExpired(record)
   const validMetadata=record=>record?.schema===1&&typeof record.path==='string'&&Number.isFinite(Date.parse(record.savedAt))
   const newer=(a,b)=>Number(a?.build===build)-Number(b?.build===build)||Date.parse(a?.savedAt)-Date.parse(b?.savedAt)
-  const reload=async()=>{index=new Map((await store.list()).map(row=>[row.key,row]))}
+  const reload = async () => {
+    index = new Map((await store.list()).map(row => [row.key, row]))
+    if (protectedAccounts) accountHint = (await store.account?.())?.userId || null
+  }
   const notify=()=>{changed();channel?.postMessage('changed')}
   const legacy=()=>{try{return localRecords()}catch(_){return []}}
   const locked=job=>supported&&!lockError?locks.request(MAINTENANCE,job):job()
@@ -23,7 +30,7 @@ export function createFogOfWarCache(build) {
   const migrate=async()=>{
     if(store.kind!=='indexedDB')return
     await locked(async()=>{
-      const rows=legacy().filter(row=>row.valid).sort((a,b)=>newer(b.record,a.record))
+      const rows=legacy().filter(row=>row.valid && (!protectedAccounts || !row.record.userId)).sort((a,b)=>newer(b.record,a.record))
       const seen=new Set()
       for(const row of rows){
         if(seen.has(recordKey(row.path,row.record.userId)))continue
@@ -43,7 +50,7 @@ export function createFogOfWarCache(build) {
     await reload()
   }
   const ready=(async()=>{
-    try{store=await openIndexedDBStore()}
+    try{store=await openIndexedDBStore({protectedAccounts})}
     catch(error){
       storageReason=`IndexedDB unavailable: ${error.name}`
       try{store=openLocalStore()}catch(localError){store=openMemoryStore();storageReason+=`; localStorage unavailable: ${localError.name}; cache lasts only in this document`}
@@ -64,13 +71,21 @@ export function createFogOfWarCache(build) {
     }
     return rows.sort((a,b)=>a.path.localeCompare(b.path))
   }
-  const visible = row => !row.snapshot?.userId || row.snapshot.userId === userId
+  const visible = row => !row.snapshot?.userId ||
+    (row.snapshot.userId === (protectedAccounts && !identityKnown ? accountHint : userId) &&
+      (!protectedAccounts || (row.snapshot.accountProtected && row.snapshot.userId === accountHint)))
+  const activeIdentity = async () => {
+    if (!protectedAccounts) return userId
+    const slot = await store.account?.()
+    return slot?.key && (!identityKnown || userId === slot.userId) ? slot.userId : null
+  }
   const select = (path, identity) => entries()
     .filter(row => row.valid && row.path === path && compatible(row.snapshot) &&
-      (!row.snapshot.userId || row.snapshot.userId === identity))
+      (!row.snapshot.userId || (row.snapshot.userId === identity &&
+        (!protectedAccounts || row.snapshot.accountProtected))))
     .sort((a,b) => Number(Boolean(b.snapshot.userId)) - Number(Boolean(a.snapshot.userId)) ||
       newer(b.snapshot,a.snapshot))[0]
-  const find = (url, identity = userId) => {
+  const find = (url, identity = protectedAccounts ? (!identityKnown || userId === accountHint ? accountHint : null) : userId) => {
     if (url.origin !== location.origin || url.search) return null
     return select(url.pathname, identity)?.snapshot || null
   }
@@ -79,7 +94,8 @@ export function createFogOfWarCache(build) {
     const row = exact
       ? entries().find(row => row.valid && row.path === path && (row.snapshot.userId || null) === identity)
       : select(path, identity)
-    if (!row) return null
+    if (!row || (protectedAccounts && row.snapshot.userId &&
+      (!row.snapshot.accountProtected || row.snapshot.userId !== await activeIdentity()))) return null
     if (row.legacy || store.kind === 'localStorage') return row.record || null
     return store.get(recordKey(path, row.snapshot.userId))
   }
@@ -109,7 +125,77 @@ export function createFogOfWarCache(build) {
   })
   const cache={
     ready,protect,find,getRecord,
+    async ensureAccount(identity) {
+      if (signingOut) return false
+      const enable = !protectedAccounts
+      if (enable) {
+        protectedAccounts = true
+        accountKeyEndpoint = '/_fow/account-key'
+      }
+      await ready
+      store.enableAccountProtection?.()
+      const slot = await store.account?.()
+      if (slot?.key && slot.userId === identity) return true
+      if (!unlocks.has(identity)) {
+        unlocks.set(identity, cache.unlockAccount(identity).finally(() => unlocks.delete(identity)))
+      }
+      return unlocks.get(identity)
+    },
+    async unlockAccount(identity) {
+      await ready
+      if (signingOut) return false
+      if (!protectedAccounts || !store.account) throw new Error('Account cache requires IndexedDB and accountKeyEndpoint')
+      const endpoint = new URL(accountKeyEndpoint, location.href)
+      if (endpoint.origin !== location.origin || (!window.isSecureContext || (endpoint.protocol !== 'https:' &&
+        !['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname)))) {
+        throw new Error('Account key endpoint must be same-origin HTTPS or a secure local loopback origin')
+      }
+      const expected = (await store.account())?.revision || null
+      const response = await fetch(endpoint, {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+        headers: {'content-type': 'application/json',
+          'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || ''},
+        body: JSON.stringify({device_id: await store.deviceId()})
+      })
+      if (!response.ok) throw new Error('Account cache key request failed')
+      const {user_id: scope, key: encoded} = await response.json()
+      if (typeof scope !== 'string' || !scope || scope !== String(identity)) {
+        throw new Error('Account cache identity mismatch')
+      }
+      const raw = Uint8Array.from(atob(encoded), char => char.charCodeAt(0))
+      if (raw.length !== 32) throw new Error('Expected an AES-256 account key')
+      const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
+      raw.fill(0)
+      return enqueue(async () => {
+        if (signingOut || !await store.setAccount({userId: scope, key}, expected)) return false
+        for (const row of legacy()) {
+          if (row.record?.userId && localStorage.getItem(row.key) === row.raw) localStorage.removeItem(row.key)
+        }
+        await reload()
+        notify()
+        return true
+      })
+    },
+    async lockAccount() {
+      signingOut = true
+      await ready
+      if (!protectedAccounts && !(await store.account?.())?.key) return
+      if (!store.setAccount) throw new Error('Cannot clear the persisted account key without IndexedDB')
+      await enqueue(async () => {
+        await store.setAccount({})
+        identityVersion++
+        await reload()
+        notify()
+      })
+    },
+    async canPresent(snapshot) {
+      if (!snapshot?.accountProtected) return true
+      const slot = await store.account?.()
+      return Boolean(slot?.key && slot.revision === snapshot.accountRevision &&
+        (!identityKnown || userId === slot.userId))
+    },
     setIdentity(identity) {
+      identityKnown = true
       if (userId === identity) return
       userId = identity
       identityVersion++
@@ -119,6 +205,7 @@ export function createFogOfWarCache(build) {
     async flush(){await ready;await writes},
     save(snapshot,{protectRoute=true}={}){
       return enqueue(async()=>{
+        if (protectedAccounts && snapshot.userId && !store.account) return null
         if(protectRoute)await protect(snapshot.path)
         const record=await encodeSnapshot({...snapshot,source:snapshot.source||'live'})
         if(!validSnapshot(record))throw new Error('Invalid Fog of War snapshot')
@@ -131,15 +218,17 @@ export function createFogOfWarCache(build) {
       if (isExpired(snapshot) || !visible({snapshot})) return null
       const record = await getRecord(snapshot.path, snapshot.userId || null, true)
       const decoded = record && !isExpired(record) ? await decodeSnapshot(record) : null
-      return version === identityVersion ? decoded : null
+      return await cache.canPresent(decoded) && version === identityVersion ? decoded : null
     },
     async load(url) {
       const version = identityVersion
       await ready
-      if (!find(url)) return null
-      const record = await getRecord(url.pathname)
+      const identity = await activeIdentity()
+      if (!find(url, identity)) return null
+      let record = await getRecord(url.pathname, identity)
+      if (!record && identity && protectedAccounts) record = await getRecord(url.pathname, null)
       const decoded = compatible(record) && await decodeSnapshot(record)
-      return version === identityVersion && !isExpired(decoded) ? decoded || null : null
+      return await cache.canPresent(decoded) && version === identityVersion && !isExpired(decoded) ? decoded || null : null
     },
     async inspect(){
       await ready;await protection

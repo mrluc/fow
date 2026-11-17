@@ -12,21 +12,46 @@ defmodule FogOfWarBasicWeb.Layouts do
   embed_templates "layouts/*"
 
   attr :socket, :any, required: true
-  attr :path, :string, required: true
+  attr :user_id, :string, default: nil
+  attr :require_user_id, :boolean, default: false
+  attr :cache, :boolean, default: true
   slot :inner_block, required: true
 
   def site(assigns) do
     ~H"""
-    <FogOfWar.region id="counter-site" path={@path} class="site-shell">
-      <header class="site-header">
-        <.link navigate={~p"/"} class="brand fow-nav">Counter</.link>
-        <nav aria-label="Main navigation">
-          <.link navigate={~p"/"} class="fow-nav">All counters</.link>
-        </nav>
-      </header>
+    <FogOfWar.region
+      :if={@cache}
+      id="counter-site"
+      user_id={@user_id}
+      require_user_id={@require_user_id}
+      class="site-shell"
+    >
+      <.site_header user_id={@user_id} />
       <main id="main-content" class="site-content">{render_slot(@inner_block)}</main>
     </FogOfWar.region>
+    <div :if={!@cache} class="site-shell">
+      <.site_header user_id={@user_id} />
+      <main id="main-content" class="site-content">{render_slot(@inner_block)}</main>
+    </div>
     <FogOfWar.dev_tools socket={@socket} />
+    """
+  end
+
+  attr :user_id, :string, default: nil
+
+  defp site_header(assigns) do
+    ~H"""
+    <header class="site-header">
+      <.link navigate={~p"/"} class="brand fow-nav">Counter</.link>
+      <nav aria-label="Main navigation">
+        <.link navigate={~p"/"} class="all-counters fow-nav">All counters</.link>
+        <.link :if={@user_id} navigate={~p"/profile"} class="header-profile fow-nav">
+          <span aria-hidden="true">◉</span>
+          <span class={"profile-name #{@user_id}"}>{String.capitalize(@user_id)}</span>
+        </.link>
+        <.link :if={!@user_id} navigate={~p"/log-in"} class="fow-nav">Log in</.link>
+      </nav>
+    </header>
     """
   end
 
