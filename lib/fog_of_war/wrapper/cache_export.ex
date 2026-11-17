@@ -1,8 +1,15 @@
 defmodule FogOfWar.Wrapper.CacheExport do
-  @moduledoc "Exports public server-rendered FoW regions as an index and binary gzip files."
+  @moduledoc """
+  Fetches anonymous server-rendered pages and extracts their FoW regions for offline navigation. The result is a route index and gzip payloads that FoW can import into browser storage.
+
+  ## How it fits
+
+  Called directly by `FogOfWar.Wrapper.NativeBundle`. `mix fow.export.cache` exposes it as a separate capture step.
+  """
   alias FogOfWar.Wrapper.{Export, Manifest}
   @build "fog-of-war-2"
 
+  @doc "Capture every selected route into a fresh output directory and return the index."
   def run!(manifest, output, opts \\ []) do
     paths = paths!(manifest)
     if File.exists?(output), do: Mix.raise("Export destination exists: #{output}")
@@ -28,6 +35,7 @@ defmodule FogOfWar.Wrapper.CacheExport do
     end
   end
 
+  @doc "Return the distinct public routes to capture, including the startup route."
   def paths!(manifest) do
     paths = Enum.uniq(manifest["public"]["paths"])
     if paths == [], do: Mix.raise("Set public.paths explicitly before export")
@@ -38,6 +46,7 @@ defmodule FogOfWar.Wrapper.CacheExport do
     paths
   end
 
+  @doc "Resolve the HTTP origin to fetch, honoring the explicit capture override."
   def capture_origin!(manifest, opts) do
     Manifest.validate_origin!(
       opts[:base_url] || get_in(manifest, ["capture", "origin"]) || manifest["web"]["origin"],
@@ -45,6 +54,7 @@ defmodule FogOfWar.Wrapper.CacheExport do
     )
   end
 
+  @doc "Extract one FoW region from a rendered response and write its gzip record. Preserve the full document for the startup route."
   def capture!(manifest, path, body, root, opts \\ []) do
     document = Floki.parse_document!(body)
 
@@ -59,7 +69,10 @@ defmodule FogOfWar.Wrapper.CacheExport do
 
     attrs = region |> elem(1) |> Map.new()
 
-    unless attrs["data-fog-of-war-path"] == path,
+    if attrs["data-fog-of-war-user-id"] || attrs["data-fog-of-war-require-user-id"] == "true",
+      do: Mix.raise("#{path}: cannot export an account-scoped FogOfWar region")
+
+    if attrs["data-fog-of-war-path"] && attrs["data-fog-of-war-path"] != path,
       do: Mix.raise("#{path}: FogOfWar region declares #{inspect(attrs["data-fog-of-war-path"])}")
 
     html = Floki.raw_html([region])
@@ -84,21 +97,39 @@ defmodule FogOfWar.Wrapper.CacheExport do
       write!(root, debug <> "/region.html", html)
     end
 
+    saved_at = DateTime.utc_now()
+
     %{
       "schema" => 1,
       "build" => @build,
       "path" => path,
       "regionId" => attrs["id"],
       "title" => document |> Floki.find("title") |> Floki.text(),
-      "savedAt" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "savedAt" => DateTime.to_iso8601(saved_at),
       "file" => file,
       "encoding" => "gzip",
       "compressedBytes" => byte_size(gzip),
       "htmlBytes" => byte_size(html),
       "sha256" => :crypto.hash(:sha256, gzip) |> Base.encode16(case: :lower)
     }
+    |> then(fn record ->
+      case attrs["data-fog-of-war-max-age-ms"] do
+        nil ->
+          record
+
+        value ->
+          case Integer.parse(value) do
+            {ms, ""} when ms > 0 and ms <= 8_000_000_000_000_000 ->
+              Map.put(record, "expiresAt", DateTime.to_unix(saved_at, :millisecond) + ms)
+
+            _ ->
+              Mix.raise("#{path}: invalid FogOfWar max age")
+          end
+      end
+    end)
   end
 
+  @doc "Write the bundle index from the captured route records and return it."
   def finish!(manifest, pages, root, opts \\ []) do
     index = %{
       "schema" => 1,

@@ -1,8 +1,16 @@
 defmodule FogOfWar.Wrapper.Output do
-  @moduledoc false
+  @moduledoc """
+  Stages generated files before replacing a project or installed app.
+  Destination checks protect the source tree and other inputs from replacement.
+
+  ## How it fits
+
+  Used by `Generator` and `Workflow` to stage replacements safely. It is an implementation detail of generation and installation.
+  """
 
   # Build beside the destination, then swap. A failed build never deletes the
   # previous project/app. Rename first, so cleanup never traverses its old path.
+  @doc "Build in a temporary sibling directory and replace the destination after success."
   def replace!(output, opts, build) do
     output = Path.expand(output)
     validate!(output, opts[:protected] || [])
@@ -43,6 +51,7 @@ defmodule FogOfWar.Wrapper.Output do
     end
   end
 
+  @doc "Check a destination against protected paths before writing or replacing it."
   def validate!(output, protected) do
     output = Path.expand(output)
 

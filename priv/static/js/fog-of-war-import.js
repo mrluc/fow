@@ -1,3 +1,4 @@
+import {isExpired} from './fog-of-war-codec'
 const hash = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(byte=>byte.toString(16).padStart(2,'0')).join('')
 const abortIfNeeded = signal => { if(signal?.aborted)throw new DOMException('Bundle import interrupted','AbortError') }
 const bytesFromHost = value => {
@@ -60,7 +61,7 @@ export async function importBundle(runtime,input,{baseURL,readAsset,batchSize=16
     if(completed.has(path)&&existing)continue
     if(bytes&&bytes+descriptor.compressedBytes>byteBudget)await flush()
     abortIfNeeded(signal)
-    if(!existing||existing.source==='bundle'&&Date.parse(existing.savedAt)<Date.parse(descriptor.savedAt)){
+    if(!isExpired(descriptor) && (!existing||existing.source==='bundle'&&Date.parse(existing.savedAt)<Date.parse(descriptor.savedAt))){
       let payload
       if(readAsset){payload=bytesFromHost(await readAsset(descriptor.file,{signal}))}
       else {

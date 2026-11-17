@@ -31,16 +31,35 @@ export const FogOfWar = {
     if (!owner || this.el.parentElement !== owner) {
       console.warn("[FogOfWar] Put FogOfWar on the top-level routed content. Offline navigation restores only this element, not its enclosing layout.")
     }
-    this.capture()
+    this.onNavigate = () => this.scheduleCapture()
+    window.addEventListener("phx:navigate", this.onNavigate)
+    this.scheduleCapture()
   },
-  updated() { this.capture() },
+  updated() { this.scheduleCapture() },
+  destroyed() { window.removeEventListener("phx:navigate", this.onNavigate) },
+  scheduleCapture() {
+    if (this.captureScheduled) return
+    this.captureScheduled = true
+    queueMicrotask(() => {
+      this.captureScheduled = false
+      if (this.el.isConnected) this.capture()
+    })
+  },
   async capture() {
     if (coordinator && !coordinator.canCapture()) return
-    const path = this.el.dataset.fogOfWarPath
-    if (!path) throw new Error("FogOfWar regions require an explicit server-declared route")
+    const {fogOfWarUserId, fogOfWarRequireUserId, fogOfWarPath} = this.el.dataset
+    const userId = fogOfWarUserId?.trim() || null
+    coordinator.cache.setIdentity(userId)
+    if (fogOfWarRequireUserId === "true" && !userId) return
+    if (!fogOfWarPath && location.search) return
+    const path = fogOfWarPath || location.pathname
+    const now = Date.now()
+    const maxAge = Number(this.el.dataset.fogOfWarMaxAgeMs)
     const snapshot = {
-      schema: 1, build: FOG_OF_WAR_BUILD, path, regionId: this.el.id, title: document.title,
-      savedAt: new Date().toISOString(), html: this.el.outerHTML,
+      schema: 1, build: FOG_OF_WAR_BUILD, path, userId, regionId: this.el.id, title: document.title,
+      savedAt: new Date(now).toISOString(),
+      ...(Number.isSafeInteger(maxAge) && maxAge > 0 ? {expiresAt: now + maxAge} : {}),
+      html: this.el.outerHTML,
     }
     try {
       await coordinator.cache.save(snapshot)

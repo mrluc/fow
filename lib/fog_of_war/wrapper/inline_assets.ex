@@ -1,5 +1,11 @@
 defmodule FogOfWar.Wrapper.InlineAssets do
-  @moduledoc "Inlines gathered startup scripts and stylesheets for Apple scheme WebViews."
+  @moduledoc """
+  An offline Apple WebView needs its startup JavaScript and CSS even when the website cannot answer. This module embeds collected same-origin scripts and styles into the startup document so it can run without fetching those files from the site. Native bundle preparation calls it automatically.
+
+  ## How it fits
+
+  Called by `FogOfWar.Wrapper.NativeBundle` when preparing the Apple startup document. App developers normally interact with the bundle preparation task instead.
+  """
 
   @doc """
   Inline gathered same-origin scripts and stylesheets in startup HTML.

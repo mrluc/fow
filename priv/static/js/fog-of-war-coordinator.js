@@ -1,4 +1,5 @@
 import {presentSavedPage} from './fog-of-war-presenter'
+import {isExpired} from './fog-of-war-codec'
 import {createFogOfWarCache} from './fog-of-war-cache'
 
 export function installFogOfWarCoordinator(liveSocket, build, {transition = update => update()} = {}) {
@@ -48,7 +49,9 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
       refresh()
     }, 1200)
   })
+  const pruneExpired = () => { cache.pruneExpired().catch(() => {}) }
   window.addEventListener('phx:page-loading-stop', () => {
+    pruneExpired()
     clearTimeout(navigationTimer)
     cache.protect(location.pathname)
     if (liveAttempt && !offline()) {
@@ -147,11 +150,12 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
   }
   let navigation = 0
   const navigate = async (url, historyAction = 'push') => {
+    const identityVersion = cache.identityVersion()
     const attempt = ++navigation
     const log = recordNavigation(url, historyAction === "pop" ? "History" : "Cached navigation")
     await cache.protect(url.pathname)
     const snapshot = await lookup(url)
-    if (attempt !== navigation || !offline()) { finishNavigation(log, 'superseded'); return true }
+    if (attempt !== navigation || identityVersion !== cache.identityVersion() || !offline()) { finishNavigation(log, 'superseded'); return true }
     if (!snapshot) {
       await cache.protect(new URL(displayedURL).pathname)
       message = 'This page is not available offline; it has not been saved.'
@@ -161,6 +165,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     }
     // Construct/validate the presentation before changing the URL.
     await transition(() => {
+      if (identityVersion !== cache.identityVersion() || isExpired(snapshot)) return
       if (!snapshotMode) enterSnapshotMode()
       presentSavedPage(outlet, snapshot)
       // The route and its visible content commit together, including during a
@@ -170,6 +175,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
       }
       displayedURL = url.href
       finishNavigation(log, 'cached')
+      pruneExpired()
       cache.protect(url.pathname)
       message = ''
       refresh()
@@ -256,6 +262,7 @@ export function installFogOfWarCoordinator(liveSocket, build, {transition = upda
     childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-phx-main', 'data-phx-session'],
   })
   cache.subscribe(refresh)
+  pruneExpired()
   refresh()
   return {
     cache, toggleConnection,

@@ -1,6 +1,18 @@
 defmodule Mix.Tasks.Fow.Bundle.Prepare do
   use Mix.Task
   @shortdoc "Prepare executable startup HTML, gzip records and native assets"
+  @moduledoc """
+  Capture the public startup document and assets for one WebView platform.
+
+      mix fow.bundle.prepare --env android-dev --platform android
+
+  Run from the Phoenix project with the selected website reachable. Output goes to `.fow/<env>/bundles/<platform>/`. Use `--platform apple` for the desktop generator, or `--platform ios` for Mob on iOS. Move an existing bundle aside or choose another `--output`. The macOS shortcut `mix fow.desktop` already prepares its bundle.
+
+  ## How it fits
+
+  This is a lower-level step. For macOS, `mix fow.desktop` calls `FogOfWar.Wrapper.NativeBundle.run!/5` itself. For mobile, run this task before `mix fow.gen.mobile`, once per selected platform.
+  """
+
   def run(args) do
     Mix.Task.run("app.config")
 
@@ -18,15 +30,17 @@ defmodule Mix.Tasks.Fow.Bundle.Prepare do
 
     if rest != [] || invalid != [], do: Mix.raise("Invalid bundle arguments")
     platform = opts[:platform] || "android"
+
     unless platform in ["android", "ios", "apple"],
       do: Mix.raise("--platform must be android, ios or apple")
+
     path = Path.expand(opts[:manifest] || ".fow.json")
     manifest = FogOfWar.Wrapper.Manifest.read!(path, opts[:env])
     project = Path.dirname(path)
 
     output =
       Path.expand(
-        opts[:output] || ".fow/native/#{manifest["environment"] || "default"}/#{platform}",
+        opts[:output] || ".fow/#{manifest["environment"] || "default"}/bundles/#{platform}",
         project
       )
 

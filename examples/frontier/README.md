@@ -33,18 +33,18 @@ The scout walks in the map at every viewport size. LiveView patches and cached n
 
 ## macOS app: Frontier
 
-`.fow.json` names the app **Frontier**, uses the same Fog of War logo as its launcher icon, and selects the four initial public coordinates. `elixirkit.startup: "live"` opens the map directly, without an intermediate public-shell page or an “Open live site” button. This development build connects to `http://127.0.0.1:47190`; keep the Frontier Phoenix server running. This mode needs the server on launch. Cached navigation works after loading, but seamless bundled-first offline launch is a separate startup mode still to be implemented.
+`.fow.json` names the app **Frontier**, uses the same Fog of War logo as its launcher icon, and selects the startup coordinate without extra bundled routes. The desktop app opens the bundled startup page and connects to the configured website when reachable.
 
 With the server running, from this example directory:
 
 ```sh
-mix fow.export
+mix fow.bundle.prepare --env dev --platform apple
 mix fow.gen.elixirkit
-cd .fow/apps/elixirkit/dev
+cd .fow/dev/projects/desktop
 ./build.sh
 ```
 
-For a single-command rebuild and local installation, run `mix fow.desktop --force` from this example directory. It refreshes the public export, replaces the generated project, builds and installs `Frontier.app` into `~/Applications`, then registers it for Spotlight. This discards changes inside the generated project; the example source and artwork remain untouched. Separate generation supports `--force`; standalone `mix fow.export` still requires a fresh export directory. Build uses the normal desktop toolchain; the repository's `elixir-client/env.sh` selects the shared native compilation cache on this development machine.
+For a single-command rebuild and local installation, run `mix fow.desktop --force` from this example directory. It refreshes the public export, replaces the generated project, builds and installs `Frontier.app` into `~/Applications`, then registers it for Spotlight. This discards changes inside the generated project; the example source and artwork remain untouched. Separate generation supports `--force`. Build uses the normal desktop toolchain; the repository's `elixir-client/env.sh` selects the shared native compilation cache on this development machine.
 
 The resulting `Frontier.app` is under `$CARGO_TARGET_DIR/release/bundle/macos/` (or the generated project's `src-tauri/target/release/bundle/macos/` without that environment variable). Copy it into `~/Applications` to launch it from Spotlight. It is locally signed for development, not notarized for distribution.
 
@@ -57,8 +57,8 @@ The `android-dev` manifest environment selects Android only. With Frontier's Pho
 
 ```sh
 mix fow.bundle.prepare --env android-dev --platform android
-mix fow.gen.mob --env android-dev --output .fow/apps/mob/android-dev
-cd .fow/apps/mob/android-dev
+mix fow.gen.mob --env android-dev --output .fow/android-dev/projects/mobile
+cd .fow/android-dev/projects/mobile
 ./build.sh --android
 ```
 

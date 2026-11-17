@@ -1,6 +1,6 @@
 defmodule FogOfWar.WrapperWorkflowTest do
   use ExUnit.Case, async: false
-  alias FogOfWar.Wrapper.{Export, Generator, Manifest, Output, Workflow}
+  alias FogOfWar.Wrapper.{NativeBundle, Generator, Manifest, Output, Workflow}
 
   setup do
     root = Path.join(System.tmp_dir!(), "fow-workflow-#{System.unique_integer([:positive])}")
@@ -8,27 +8,24 @@ defmodule FogOfWar.WrapperWorkflowTest do
     on_exit(fn -> File.rm_rf!(root) end)
 
     manifest = %{
-      "schema" => 1,
+      "schema" => 3,
       "app" => %{
         "name" => "Sample",
         "slug" => "sample",
         "identifier" => "dev.test.sample",
         "version" => "0.1.0"
       },
-      "web" => %{"origin" => "https://example.com", "start_path" => "/"},
-      "public" => %{
-        "paths" => ["/"],
-        "bundle" => "public",
-        "static_root" => "priv/static",
-        "asset_directories" => []
-      },
+      "web" => %{"origin" => "https://example.com"},
+      "startup" => %{"path" => "/"},
+      "preload" => %{"paths" => []},
+      "assets" => %{"directories" => []},
       "mob" => %{"platforms" => ["android"]},
       "elixirkit" => %{"width" => 800, "height" => 600}
     }
 
     path = Path.join(root, ".fow.json")
     Manifest.write!(path, manifest)
-    %{root: root, manifest: manifest, path: path}
+    %{root: root, manifest: Manifest.resolve!(manifest), path: path}
   end
 
   defp html(_url),
@@ -51,7 +48,10 @@ defmodule FogOfWar.WrapperWorkflowTest do
     manifest: manifest,
     path: path
   } do
-    Export.run!(manifest, root, Path.join(root, "public"), fetch: &html/1)
+    NativeBundle.run!(manifest, root, Path.join(root, ".fow/default/bundles/apple"), "apple",
+      fetch: &html/1
+    )
+
     output = Path.join(root, "desktop")
     Generator.run!(:elixirkit, path, output)
     File.write!(Path.join(output, "custom.txt"), "user edit")
@@ -101,7 +101,10 @@ defmodule FogOfWar.WrapperWorkflowTest do
     manifest: manifest,
     path: path
   } do
-    Export.run!(manifest, root, Path.join(root, "public"), fetch: &html/1)
+    NativeBundle.run!(manifest, root, Path.join(root, ".fow/default/bundles/apple"), "apple",
+      fetch: &html/1
+    )
+
     output = Path.join(root, "desktop")
     Generator.run!(:elixirkit, path, output)
     target = Path.join(root, "native-target")

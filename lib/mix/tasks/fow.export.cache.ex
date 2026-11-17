@@ -2,9 +2,15 @@ defmodule Mix.Tasks.Fow.Export.Cache do
   use Mix.Task
   @shortdoc "Export public FoW regions as binary gzip files and a route index (no browser)"
   @moduledoc """
-  Fetches initial server-rendered HTML from the selected site's public paths.
-  It does not read a browser profile, execute hooks, or import into IndexedDB.
-  Use `--env NAME` for manifest overrides and `--debug` to retain intermediate HTML.
+  Export offline route snapshots without building an app.
+
+      mix fow.export.cache --env dev --output .fow/dev/bundles/cache
+
+  Run from the Phoenix project with the public website reachable. The output contains an index and gzip payloads for an importer. Use `--debug` to retain capture HTML for troubleshooting. For generated native apps, `mix fow.bundle.prepare` adds the platform-specific startup document and assets.
+
+  ## How it fits
+
+  This is a lower-level capture tool for inspecting or consuming gzip route records. Native bundle preparation calls the same `FogOfWar.Wrapper.CacheExport` module directly; running this task separately is unnecessary for a normal build.
   """
   def run(args) do
     Mix.Task.run("app.config")

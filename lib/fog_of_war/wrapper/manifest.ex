@@ -1,7 +1,14 @@
 defmodule FogOfWar.Wrapper.Manifest do
-  @moduledoc "A reviewable, JSON-only contract between a Phoenix app and its native wrappers."
-  @schema 2
+  @moduledoc """
+  Reads the settings that connect a Phoenix website to its native wrappers. The JSON file specifies the website origin, startup route, extra offline routes and native app identity. Named environments can override those settings for development or deployment.
 
+  ## How it fits
+
+  Read by the wrapper tasks and their underlying workflow and generator modules. `mix fow.manifest` calls discovery to create the initial file.
+  """
+  @schema 3
+
+  @doc "Derive a starter manifest from the current Mix project and its Phoenix endpoint configuration. Review the result before using it to capture public pages."
   def discover(opts) do
     config = Mix.Project.config()
     app = config[:app]
@@ -66,18 +73,15 @@ defmodule FogOfWar.Wrapper.Manifest do
       },
       "web" => %{
         "origin" => origin,
-        "start_path" => "/",
         "endpoint" => inspect(endpoint),
         "router" => inspect(router),
         "discovered_routes" => routes
       },
-      "public" => %{
-        "paths" => Keyword.get_values(opts, :public),
+      "startup" => %{"path" => "/"},
+      "preload" => %{"paths" => Enum.reject(Keyword.get_values(opts, :public), &(&1 == "/"))},
+      "assets" => %{
         "static_root" => static,
-        "bundle" => ".fow/public",
-        "asset_directories" => ["assets", "css", "fonts", "images"],
-        "note" =>
-          "Only list routes whose unauthenticated rendered content may be distributed publicly. No cookies are exported."
+        "directories" => ["assets", "css", "fonts", "images"]
       },
       "mob" => %{"platforms" => ["android", "ios"]},
       "elixirkit" => %{"width" => 1060, "height" => 760}
@@ -85,19 +89,20 @@ defmodule FogOfWar.Wrapper.Manifest do
     |> tap(&resolve!/1)
   end
 
+  @doc "Read a JSON manifest, apply the selected environment and validate the result."
   def read!(path, env \\ nil), do: path |> File.read!() |> Jason.decode!() |> resolve!(env)
 
   @doc "Merge a named environment over top-level defaults, then validate the result."
   def resolve!(document, env \\ nil) when is_map(document) do
-    unless document["schema"] in [1, 2],
-      do: Mix.raise("Unsupported .fow.json schema; expected 1 or 2")
+    unless document["schema"] == @schema,
+      do: Mix.raise("Unsupported .fow.json schema; expected 3")
 
     case Map.fetch(document, "envs") do
       :error ->
         if env && env != document["environment"],
           do: Mix.raise("Manifest has no environment #{inspect(env)}")
 
-        validate!(document)
+        document |> normalize_profile() |> validate!()
 
       {:ok, profiles} when is_map(profiles) ->
         name = env || document["default_env"] || "dev"
@@ -122,19 +127,35 @@ defmodule FogOfWar.Wrapper.Manifest do
            ),
            do: Mix.raise("Environment overrides cannot replace manifest control fields")
 
-        resolved =
-          document
-          |> Map.drop(["envs", "default_env"])
-          |> deep_merge(overrides)
-          |> Map.put("environment", name)
-          |> validate!()
-
-        # Isolate generated artifacts even when profiles inherit the same output defaults.
-        update_in(resolved, ["public", "bundle"], &Path.join(&1, name))
+        document
+        |> Map.drop(["envs", "default_env"])
+        |> deep_merge(overrides)
+        |> Map.put("environment", name)
+        |> normalize_profile()
+        |> validate!()
 
       _ ->
         Mix.raise("envs must be a map of environment names to override maps")
     end
+  end
+
+  defp normalize_profile(%{"schema" => 3} = manifest) do
+    start = get_in(manifest, ["startup", "path"])
+    preload = get_in(manifest, ["preload", "paths"]) || []
+
+    unless is_list(preload), do: Mix.raise("preload.paths must be a list")
+
+    public = %{
+      "paths" => Enum.uniq([start | preload]),
+      "static_root" => get_in(manifest, ["assets", "static_root"]) || "priv/static",
+      "asset_directories" =>
+        get_in(manifest, ["assets", "directories"]) || ["assets", "css", "fonts", "images"],
+      "bundle" => Path.join([".fow", manifest["environment"] || "default", "bundles", "source"])
+    }
+
+    manifest
+    |> Map.put("public", public)
+    |> Map.update("web", %{"start_path" => start}, &Map.put(&1, "start_path", start))
   end
 
   defp deep_merge(left, right) do
@@ -144,8 +165,9 @@ defmodule FogOfWar.Wrapper.Manifest do
     end)
   end
 
+  @doc "Validate a resolved manifest and return it with a normalized website origin."
   def validate!(%{"schema" => schema, "app" => app, "web" => web, "public" => public} = manifest)
-      when schema in [1, 2] and is_map(app) and is_map(web) and is_map(public) do
+      when schema == @schema and is_map(app) and is_map(web) and is_map(public) do
     require_match!(
       app["slug"],
       ~r/^[a-z][a-z0-9_]*$/,
@@ -200,16 +222,14 @@ defmodule FogOfWar.Wrapper.Manifest do
         do: Mix.raise("elixirkit.#{key} must be 240..4096")
     end
 
-    unless (get_in(manifest, ["elixirkit", "startup"]) || "bundled") in ["bundled", "live"],
-      do: Mix.raise("elixirkit.startup must be bundled or live")
-
     if app["icon"], do: relative_path!(app["icon"])
     %{manifest | "web" => Map.put(web, "origin", origin)}
   end
 
   def validate!(_),
-    do: Mix.raise("Resolved manifest requires schema 1 or 2 and app, web, public maps")
+    do: Mix.raise("Resolved manifest requires schema 3 and app, web, public maps")
 
+  @doc "Validate a website origin used for capture or startup and normalize it."
   def validate_origin!(value, label \\ "origin") do
     unless is_binary(value), do: Mix.raise("#{label} must be an HTTP(S) origin")
     uri = URI.parse(value)
@@ -224,6 +244,7 @@ defmodule FogOfWar.Wrapper.Manifest do
     URI.to_string(%{uri | path: nil, host: String.downcase(uri.host)})
   end
 
+  @doc "Validate a route pathname suitable for public bundle capture."
   def validate_path!(path) do
     unless is_binary(path) && String.starts_with?(path, "/") && !String.starts_with?(path, "//") &&
              !String.contains?(path, ["?", "#", "\\", "\0"]) &&
@@ -233,6 +254,7 @@ defmodule FogOfWar.Wrapper.Manifest do
     path
   end
 
+  @doc "Validate a project-relative file path used by the manifest."
   def relative_path!(path) do
     unless is_binary(path) && path != "" && Path.type(path) == :relative &&
              !Enum.any?(Path.split(path), &(&1 in ["..", "."])) &&
@@ -242,9 +264,11 @@ defmodule FogOfWar.Wrapper.Manifest do
     path
   end
 
+  @doc "Write the manifest as JSON. Pass force to replace an existing file."
   def write!(path, manifest, force \\ false) do
     if File.exists?(path) && !force, do: Mix.raise("#{path} exists; edit it or pass --force")
     File.mkdir_p!(Path.dirname(path))
+    manifest = Map.drop(manifest, ["public"]) |> update_in(["web"], &Map.delete(&1, "start_path"))
     File.write!(path, [Jason.encode_to_iodata!(manifest, pretty: true), "\n"])
   end
 

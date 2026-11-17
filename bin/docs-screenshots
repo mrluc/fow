@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+set -eu
+cd "$(dirname "$0")/../test/browser"
+exec node docs-screenshots.cjs

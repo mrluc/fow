@@ -1,13 +1,29 @@
 defmodule FogOfWar.Wrapper.Workflow do
-  @moduledoc "Build and local installation steps for generated desktop projects."
+  @moduledoc """
+  Runs the macOS steps around generation. Use it to locate a generated project, build its .app, or install a finished app for local use. `mix fow.desktop` runs the full sequence.
+
+  ## How it fits
+
+  The desktop Mix tasks call these functions directly. `desktop!/2` composes `NativeBundle`, `Generator`, the build function and the install function.
+  """
   alias FogOfWar.Wrapper.{Generator, Manifest, NativeBundle, Output}
 
+  @doc "Resolve the generated project directory for a target and manifest environment."
   def project_path(manifest_path, target, opts \\ []) do
     manifest = Manifest.read!(manifest_path, opts[:env])
-    default = Path.join([".fow/apps", to_string(target)] ++ List.wrap(manifest["environment"]))
+
+    default =
+      Path.join([
+        ".fow",
+        manifest["environment"] || "default",
+        "projects",
+        if(target == :mob, do: "mobile", else: "desktop")
+      ])
+
     Path.expand(opts[:output] || default)
   end
 
+  @doc "Run the generated desktop build script and return the path to its .app."
   def build_elixirkit!(project, opts \\ []) do
     project = Path.expand(project)
     manifest = Manifest.read!(Path.join(project, ".fow.json"))
@@ -29,6 +45,7 @@ defmodule FogOfWar.Wrapper.Workflow do
     app
   end
 
+  @doc "Copy an existing .app into the Applications directory and register it with Spotlight."
   def install_osx_local!(app, opts \\ []) do
     unless (opts[:os] || :os.type()) == {:unix, :darwin},
       do: Mix.raise("Local macOS installation requires macOS")
@@ -61,6 +78,7 @@ defmodule FogOfWar.Wrapper.Workflow do
     destination
   end
 
+  @doc "Prepare an Apple bundle, generate and build the desktop project, then install the app."
   def desktop!(manifest_path, opts \\ []) do
     unless (opts[:os] || :os.type()) == {:unix, :darwin},
       do: Mix.raise("Desktop build/install convenience requires macOS")
@@ -68,7 +86,7 @@ defmodule FogOfWar.Wrapper.Workflow do
     manifest_path = Path.expand(manifest_path)
     manifest = Manifest.read!(manifest_path, opts[:env])
     root = Path.dirname(manifest_path)
-    bundle = Path.join([root, ".fow/native", manifest["environment"] || "default", "apple"])
+    bundle = Path.join([root, ".fow", manifest["environment"] || "default", "bundles", "apple"])
     project = project_path(manifest_path, :elixirkit, opts)
     # Reject unsafe outputs before fetching pages or running a build.
     Output.validate!(project, [root, bundle])

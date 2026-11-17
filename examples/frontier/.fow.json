@@ -1,5 +1,5 @@
 {
-  "schema": 2,
+  "schema": 3,
   "default_env": "dev",
   "envs": {
     "dev": {},
@@ -11,12 +11,11 @@
       }
     },
     "multi-dev": {
-      "web": {
-        "start_path": "/multi/lat/0/lon/0"
+      "startup": {
+        "path": "/multi/lat/0/lon/0"
       },
-      "public": {
+      "preload": {
         "paths": [
-          "/multi/lat/0/lon/0",
           "/multi/lat/0/lon/1",
           "/multi/lat/1/lon/0",
           "/multi/lat/1/lon/1"
@@ -24,12 +23,11 @@
       }
     },
     "single-dev": {
-      "web": {
-        "start_path": "/lat/0/lon/0"
+      "startup": {
+        "path": "/lat/0/lon/0"
       },
-      "public": {
+      "preload": {
         "paths": [
-          "/lat/0/lon/0",
           "/lat/0/lon/1",
           "/lat/1/lon/0",
           "/lat/1/lon/1"
@@ -51,35 +49,32 @@
   },
   "web": {
     "origin": "http://127.0.0.1:47190",
-    "start_path": "/multi/lat/0/lon/0",
     "endpoint": "FogOfWarFrontierWeb.Endpoint",
     "router": "FogOfWarFrontierWeb.Router"
   },
-  "public": {
-    "paths": [
-      "/multi/lat/0/lon/0",
-      "/multi/lat/0/lon/1",
-      "/multi/lat/1/lon/0",
-      "/multi/lat/1/lon/1"
-    ],
-    "static_root": "priv/static",
-    "bundle": ".fow/public",
-    "asset_directories": [
-      "assets",
-      "css",
-      "images",
-      "fonts"
-    ]
-  },
   "elixirkit": {
     "width": 1200,
-    "height": 900,
-    "startup": "live"
+    "height": 900
   },
   "mob": {
     "platforms": [
       "android",
       "ios"
+    ]
+  },
+  "startup": {
+    "path": "/multi/lat/0/lon/0"
+  },
+  "preload": {
+    "paths": []
+  },
+  "assets": {
+    "static_root": "priv/static",
+    "directories": [
+      "assets",
+      "css",
+      "images",
+      "fonts"
     ]
   }
 }

@@ -24,7 +24,7 @@ defmodule Mix.Tasks.Frontier.PreloadImages do
 
     block =
       Enum.join(
-        [@start, "<!-- Regenerate with mix frontier.preload_images. -->"] ++
+        [@start, "<%!-- Regenerate with mix frontier.preload_images. --%>"] ++
           Enum.map(urls, &~s(<link rel="preload" as="image" href="#{&1}" />)) ++
           [@finish],
         "\n"

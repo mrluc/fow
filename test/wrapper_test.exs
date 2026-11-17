@@ -1,6 +1,6 @@
 defmodule FogOfWar.WrapperTest do
   use ExUnit.Case, async: false
-  alias FogOfWar.Wrapper.{Export, Generator, Manifest}
+  alias FogOfWar.Wrapper.{NativeBundle, Manifest}
 
   setup do
     root =
@@ -13,20 +13,17 @@ defmodule FogOfWar.WrapperTest do
     File.write!(Path.join(root, "priv/static/css/site.css"), "body { color: green }")
 
     manifest = %{
-      "schema" => 1,
+      "schema" => 3,
       "app" => %{
         "name" => "Sample",
         "slug" => "sample",
         "identifier" => "dev.example.sample",
         "version" => "0.1.0"
       },
-      "web" => %{"origin" => "https://example.com", "start_path" => "/"},
-      "public" => %{
-        "paths" => ["/", "/two"],
-        "static_root" => "priv/static",
-        "bundle" => "public",
-        "asset_directories" => ["css"]
-      },
+      "web" => %{"origin" => "https://example.com"},
+      "startup" => %{"path" => "/"},
+      "preload" => %{"paths" => ["/two"]},
+      "assets" => %{"directories" => ["css"]},
       "mob" => %{"platforms" => ["android", "ios"]},
       "elixirkit" => %{"width" => 800, "height" => 600}
     }
@@ -40,34 +37,7 @@ defmodule FogOfWar.WrapperTest do
     """
 
     on_exit(fn -> File.rm_rf!(root) end)
-    %{root: root, manifest: manifest, html: html}
-  end
-
-  test "export strips executable and session state, keeps navigation and copies only public assets",
-       context do
-    %{root: root, manifest: manifest, html: html} = context
-
-    bundle =
-      Export.run!(manifest, root, Path.join(root, "public"),
-        fetch: fn url -> for_path(html, url) end
-      )
-
-    assert map_size(bundle["pages"]) == 2
-    assert bundle["assets"] == %{"/css/site.css" => "assets/css/site.css"}
-    page = File.read!(Path.join([root, "public", bundle["pages"]["/"]["file"]]))
-    refute page =~ "SECRET"
-    refute page =~ "SIGNED"
-    refute page =~ "secret()"
-    refute page =~ "dev tools"
-    refute page =~ "data-phx-session"
-    assert page =~ "href=\"/two\""
-    assert page =~ "disabled=\"disabled\""
-    assert page =~ "connect-src 'none'"
-    assert page =~ "src=\"/_fog/bootstrap.js\""
-
-    assert_raise Mix.Error, ~r/destination exists/, fn ->
-      Export.run!(manifest, root, Path.join(root, "public"))
-    end
+    %{root: root, manifest: Manifest.resolve!(manifest), html: html}
   end
 
   test "CSS imports using url() and quoted paths are exported recursively", context do
@@ -82,58 +52,12 @@ defmodule FogOfWar.WrapperTest do
         do: File.write!(Path.join(root, "priv/static/css/" <> name), "body {color: green}")
 
     bundle =
-      Export.run!(manifest, root, Path.join(root, "public"),
+      NativeBundle.run!(manifest, root, Path.join(root, manifest["public"]["bundle"]), "apple",
         fetch: fn url -> for_path(html, url) end
       )
 
-    assert Map.has_key?(bundle["assets"], "/css/terrain.css")
-    assert Map.has_key?(bundle["assets"], "/css/detail.css")
-  end
-
-  test "desktop live startup opens the configured route and includes native icon paths",
-       context do
-    %{root: root, manifest: manifest, html: html} = context
-    manifest = put_in(manifest, ["elixirkit", "startup"], "live")
-
-    Export.run!(manifest, root, Path.join(root, "public"),
-      fetch: fn url -> for_path(html, url) end
-    )
-
-    Manifest.write!(Path.join(root, ".fow.json"), manifest)
-    output = Path.join(root, "live-desktop")
-    Generator.run!(:elixirkit, Path.join(root, ".fow.json"), output)
-    assert File.read!(Path.join(output, "src-tauri/src/main.rs")) =~ "WebviewUrl::External(live)"
-    config = File.read!(Path.join(output, "src-tauri/tauri.conf.json")) |> Jason.decode!()
-    assert "icons/icon.icns" in config["bundle"]["icon"]
-
-    assert_raise Mix.Error, ~r/elixirkit.startup/, fn ->
-      Manifest.validate!(put_in(manifest, ["elixirkit", "startup"], "typo"))
-    end
-  end
-
-  test "a generated desktop contains public artifacts and standalone code, never source Phoenix app",
-       %{root: root, manifest: manifest, html: html} do
-    Export.run!(manifest, root, Path.join(root, "public"),
-      fetch: fn url -> for_path(html, url) end
-    )
-
-    Manifest.write!(Path.join(root, ".fow.json"), manifest)
-    output = Path.join(root, "desktop")
-    Generator.run!(:elixirkit, Path.join(root, ".fow.json"), output)
-    mix = File.read!(Path.join(output, "mix.exs"))
-    refute mix =~ ":phoenix"
-    refute mix =~ ":fow"
-    refute mix =~ "path:"
-    assert mix =~ ":elixirkit"
-
-    for file <- Path.wildcard(Path.join(output, "lib/**/*.ex")) ++ [Path.join(output, "mix.exs")],
-        do: Code.string_to_quoted!(File.read!(file))
-
-    assert File.read!(Path.join(output, "src-tauri/src/main.rs")) =~ ".initialization_script"
-
-    assert_raise Mix.Error, ~r/Destination exists/, fn ->
-      Generator.run!(:elixirkit, Path.join(root, ".fow.json"), output)
-    end
+    assert Map.has_key?(bundle["files"], "fog-of-war-assets://bundle/css/terrain.css")
+    assert Map.has_key?(bundle["files"], "fog-of-war-assets://bundle/css/detail.css")
   end
 
   test "public assets cannot follow symlinks outside static root", %{
@@ -146,12 +70,12 @@ defmodule FogOfWar.WrapperTest do
     File.ln_s!(Path.join(root, "secret.css"), Path.join(root, "priv/static/css/site.css"))
 
     assert_raise Mix.Error, ~r/symlinked/, fn ->
-      Export.run!(manifest, root, Path.join(root, "public"),
+      NativeBundle.run!(manifest, root, Path.join(root, manifest["public"]["bundle"]), "apple",
         fetch: fn url -> for_path(html, url) end
       )
     end
 
-    refute File.exists?(Path.join(root, "public"))
+    refute File.exists?(Path.join(root, manifest["public"]["bundle"]))
   end
 
   test "manifest requires explicit public paths and rejects ambiguous origins or escaping paths",
@@ -167,7 +91,12 @@ defmodule FogOfWar.WrapperTest do
     end
 
     assert_raise Mix.Error, fn ->
-      Export.run!(put_in(manifest, ["public", "paths"], []), root, Path.join(root, "public"))
+      NativeBundle.run!(
+        put_in(manifest, ["public", "paths"], []),
+        root,
+        Path.join(root, manifest["public"]["bundle"]),
+        "apple"
+      )
     end
   end
 

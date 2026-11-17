@@ -51,7 +51,7 @@ function mountDevTools(el, coordinator) {
     if (!html) {
       try {
         const snapshot=await coordinator.cache.decode(entry.snapshot)
-        if (version===detailVersion) get('[data-detail]').textContent=header+snapshot.html
+        if (version===detailVersion) get('[data-detail]').textContent=header+(snapshot?.html || 'Saved HTML is unavailable.')
       } catch (_) { if (version===detailVersion) get('[data-detail]').textContent=header+'Saved HTML is unreadable.' }
     }
   }

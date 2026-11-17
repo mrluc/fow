@@ -1,4 +1,5 @@
-import {DATABASE, PAGE_PREFIX, describeRecord, stringifyLegacy, validSnapshot} from './fog-of-war-codec'
+import {sealSnapshot, openSnapshot} from './fog-of-war-encryption'
+import {DATABASE, PAGE_PREFIX, describeRecord, recordKey, stringifyLegacy, validSnapshot} from './fog-of-war-codec'
 
 const requestResult = request => new Promise((resolve,reject) => {
   request.onsuccess = () => resolve(request.result)
@@ -34,22 +35,54 @@ export async function openIndexedDBStore() {
     const [value]=await Promise.all([read,complete])
     if(!value?.value)throw new Error('IndexedDB write/read probe failed')
   } catch(error) { db.close();throw error }
+  let keyPromise
+  const key = () => keyPromise ||= (async () => {
+    const read = async () => {
+      const tx = db.transaction('imports'), complete = done(tx)
+      const [entry] = await Promise.all([
+        requestResult(tx.objectStore('imports').get('snapshot-encryption-key')), complete
+      ])
+      return entry?.key
+    }
+    const existing = await read()
+    if (existing) return existing
+    const candidate = await crypto.subtle.generateKey({name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt'])
+    const tx = db.transaction('imports', 'readwrite'), complete = done(tx)
+    const keys = tx.objectStore('imports')
+    const request = keys.get('snapshot-encryption-key')
+    request.onsuccess = () => {
+      if (!request.result) keys.add({id: 'snapshot-encryption-key', key: candidate})
+    }
+    await complete
+    return read()
+  })().catch(error => {
+    keyPromise = null
+    throw error
+  })
+
   return {
     kind:'indexedDB',
-    async list() { const tx=db.transaction('metadata');const complete=done(tx);const [result]=await Promise.all([requestResult(tx.objectStore('metadata').getAll()),complete]);return result },
-    async get(path) { const tx=db.transaction('pages');const complete=done(tx);const [result]=await Promise.all([requestResult(tx.objectStore('pages').get(path)),complete]);return result || null },
+    async list() { const tx=db.transaction('metadata');const complete=done(tx);const [result]=await Promise.all([requestResult(tx.objectStore('metadata').getAll()),complete]);return result.map(row => ({...row, path: row.snapshot.path})) },
+    async get(path) { const tx=db.transaction('pages');const complete=done(tx);const [result]=await Promise.all([requestResult(tx.objectStore('pages').get(path)),complete]);if (!result) return null
+      const record = {...result, path: result.route || result.path}
+      return record.htmlEncoding === 'gzip-aes-gcm' ? openSnapshot(record, await key()) : record },
     async progress(id) { const tx=db.transaction('imports');const complete=done(tx);const [result]=await Promise.all([requestResult(tx.objectStore('imports').get(id)),complete]);return result },
     async write(records,{replace=()=>true,progress}={}) {
+      if (records.some(record => record.htmlEncoding === 'gzip')) {
+        const encryptionKey = await key()
+        records = await Promise.all(records.map(record => sealSnapshot(record, encryptionKey)))
+      }
       const tx=db.transaction(['pages','metadata','imports'],'readwrite'),complete=done(tx)
       const pages=tx.objectStore('pages'), metadata=tx.objectStore('metadata'),stored=[],skipped=[]
       let writeError
       try {
         for(const record of records) {
-          const request=pages.get(record.path)
+          const key=recordKey(record.path, record.userId)
+          const request=pages.get(key)
           request.onsuccess=()=>{
             try {
               if(!replace(request.result,record)){skipped.push(record.path);return}
-              pages.put(record);metadata.put(describeRecord(record));stored.push(record.path)
+              pages.put({...record,path:key,route:record.path});metadata.put({...describeRecord(record),path:key});stored.push(record.path)
             }catch(error){writeError=error;tx.abort()}
           }
         }
@@ -92,22 +125,22 @@ export function openLocalStore() {
   return {
     kind:'localStorage',
     async list(){return localRecords().map(row=>({...row,snapshot:row.record}))},
-    async get(path){return localRecords().filter(row=>row.valid&&row.path===path).sort((a,b)=>Date.parse(b.record.savedAt)-Date.parse(a.record.savedAt))[0]?.record || null},
+    async get(path){return localRecords().filter(row=>row.valid&&recordKey(row.path,row.record.userId)===path).sort((a,b)=>Date.parse(b.record.savedAt)-Date.parse(a.record.savedAt))[0]?.record || null},
     async write(records){
       for(const record of records){
-        const key=PAGE_PREFIX+record.path
+        const key=PAGE_PREFIX+recordKey(record.path,record.userId)
         localStorage.setItem(key,stringifyLegacy(record))
-        for(const row of localRecords())if(row.valid&&row.path===record.path&&row.key!==key)localStorage.removeItem(row.key)
+        for(const row of localRecords())if(row.valid&&recordKey(row.path,row.record.userId)===recordKey(record.path,record.userId)&&row.key!==key)localStorage.removeItem(row.key)
       }
       return {stored:records.map(record=>record.path),skipped:[]}
     },
-    async remove(paths){for(const row of localRecords())if(row.valid&&paths.includes(row.path))localStorage.removeItem(row.key)},
+    async remove(paths){for(const row of localRecords())if(row.valid&&paths.includes(recordKey(row.path,row.record.userId)))localStorage.removeItem(row.key)},
   }
 }
 
 export function openMemoryStore() {
   const records=new Map()
   return {kind:'memory', async list(){return [...records.values()].map(record=>describeRecord(record))},
-    async get(path){return records.get(path)||null},async write(values){for(const record of values)records.set(record.path,record);return {stored:values.map(record=>record.path),skipped:[]}},
+    async get(path){return records.get(path)||null},async write(values){for(const record of values)records.set(recordKey(record.path,record.userId),record);return {stored:values.map(record=>record.path),skipped:[]}},
     async remove(paths){paths.forEach(path=>records.delete(path))}}
 }

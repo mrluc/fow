@@ -16,23 +16,7 @@
       "ios"
     ]
   },
-  "public": {
-    "asset_directories": [
-      "assets",
-      "css",
-      "fonts",
-      "images"
-    ],
-    "bundle": ".fow/public",
-    "note": "Only list routes whose unauthenticated rendered content may be distributed publicly. No cookies are exported.",
-    "paths": [
-      "/",
-      "/counters/one",
-      "/counters/two"
-    ],
-    "static_root": "priv/static"
-  },
-  "schema": 2,
+  "schema": 3,
   "web": {
     "discovered_routes": [
       "/",
@@ -40,8 +24,7 @@
     ],
     "endpoint": "FogOfWarBasicWeb.Endpoint",
     "origin": "http://127.0.0.1:47180",
-    "router": "FogOfWarBasicWeb.Router",
-    "start_path": "/"
+    "router": "FogOfWarBasicWeb.Router"
   },
   "default_env": "dev",
   "envs": {
@@ -61,5 +44,23 @@
         ]
       }
     }
+  },
+  "startup": {
+    "path": "/"
+  },
+  "preload": {
+    "paths": [
+      "/counters/one",
+      "/counters/two"
+    ]
+  },
+  "assets": {
+    "static_root": "priv/static",
+    "directories": [
+      "assets",
+      "css",
+      "fonts",
+      "images"
+    ]
   }
 }

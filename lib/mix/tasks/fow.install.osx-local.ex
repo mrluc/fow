@@ -1,7 +1,17 @@
 defmodule Mix.Tasks.Fow.Install.OsxLocal do
   use Mix.Task
   @shortdoc "Install a macOS app in Applications and register it with Spotlight"
-  @moduledoc "Run `mix fow.install.osx-local --app path/to/App.app [--force] [--applications path]`."
+  @moduledoc """
+  Install an existing macOS .app and register it with Spotlight.
+
+      mix fow.install.desktop --app "/path/to/My App.app"
+
+  Use this after building separately, or use `mix fow.desktop` for the complete workflow. The default destination is ~/Applications. Pass `--applications DIR` to choose another directory or `--force` to replace an installed copy.
+
+  ## How it fits
+
+  This is the install step used by `mix fow.desktop`. Both call `FogOfWar.Wrapper.Workflow.install_osx_local!/2` directly. Use it separately when you already have a built app.
+  """
   def run(args) do
     {opts, rest, invalid} =
       OptionParser.parse(args, strict: [app: :string, applications: :string, force: :boolean])
@@ -19,6 +29,16 @@ end
 defmodule :"Elixir.Mix.Tasks.Fow.Install.Osx-local" do
   use Mix.Task
   @shortdoc "Install a macOS app and register it with Spotlight"
-  @moduledoc "Alias for `mix fow.install.osx_local`; accepts --app, --applications and --force."
+  @moduledoc """
+  Install an existing macOS .app and register it with Spotlight.
+
+      mix fow.install.desktop --app "/path/to/My App.app"
+
+  Use this after building separately, or use `mix fow.desktop` for the complete workflow. The default destination is ~/Applications. Pass `--applications DIR` to choose another directory or `--force` to replace an installed copy.
+
+  ## How it fits
+
+  This is the install step used by `mix fow.desktop`. Both call `FogOfWar.Wrapper.Workflow.install_osx_local!/2` directly. Use it separately when you already have a built app.
+  """
   defdelegate run(args), to: Mix.Tasks.Fow.Install.OsxLocal
 end

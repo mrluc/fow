@@ -1,7 +1,14 @@
 defmodule FogOfWar.Wrapper.NativeBundle do
-  @moduledoc "Prepares executable public startup HTML and allowlisted native assets."
+  @moduledoc """
+  Turns public route captures into files a native WebView can serve at startup. Android and Apple use different asset loading mechanisms, so each gets its own prepared directory. Use `mix fow.bundle.prepare` to produce one.
+
+  ## How it fits
+
+  Called by `mix fow.bundle.prepare` and directly by `FogOfWar.Wrapper.Workflow.desktop!/2`. It uses `CacheExport` for routes, `Export` for assets and `InlineAssets` for Apple startup documents.
+  """
   alias FogOfWar.Wrapper.{CacheExport, Export, InlineAssets}
 
+  @doc "Capture public routes, prepare startup HTML and assets for the selected platform, and return the native resource manifest. Supply a resolved manifest and a fresh output directory."
   def run!(manifest, project, output, platform, opts \\ [])
       when platform in ["android", "ios", "apple"] do
     if File.exists?(output), do: Mix.raise("Native bundle destination exists: #{output}")

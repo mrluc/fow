@@ -1,6 +1,6 @@
 defmodule FogOfWar.CacheExportTest do
   use ExUnit.Case, async: false
-  alias FogOfWar.Wrapper.{CacheExport, Export, Generator, Manifest}
+  alias FogOfWar.Wrapper.{CacheExport, NativeBundle, Generator, Manifest}
 
   setup do
     root = Path.join(System.tmp_dir!(), "fow-cache-export-#{System.unique_integer([:positive])}")
@@ -8,14 +8,14 @@ defmodule FogOfWar.CacheExportTest do
     on_exit(fn -> File.rm_rf!(root) end)
 
     manifest = %{
-      "schema" => 2,
+      "schema" => 3,
       "default_env" => "dev",
       "envs" => %{
         "dev" => %{},
         "release-candidate" => %{
           "app" => %{"identifier" => "dev.example.candidate", "name" => "Candidate"},
           "web" => %{"origin" => "https://candidate.example"},
-          "public" => %{"paths" => ["/"]}
+          "preload" => %{"paths" => []}
         }
       },
       "app" => %{
@@ -24,13 +24,10 @@ defmodule FogOfWar.CacheExportTest do
         "identifier" => "dev.example.app",
         "version" => "0.1.0"
       },
-      "web" => %{"origin" => "https://example.com", "start_path" => "/"},
-      "public" => %{
-        "paths" => ["/", "/two"],
-        "static_root" => "priv/static",
-        "bundle" => "public",
-        "asset_directories" => []
-      },
+      "web" => %{"origin" => "https://example.com"},
+      "startup" => %{"path" => "/"},
+      "preload" => %{"paths" => ["/two"]},
+      "assets" => %{"directories" => []},
       "mob" => %{"platforms" => ["android"]},
       "elixirkit" => %{"width" => 800, "height" => 600}
     }
@@ -48,14 +45,14 @@ defmodule FogOfWar.CacheExportTest do
        %{manifest: doc} do
     dev = Manifest.resolve!(doc)
     assert dev["environment"] == "dev"
-    assert dev["public"]["bundle"] == "public/dev"
+    assert dev["public"]["bundle"] == ".fow/dev/bundles/source"
     candidate = Manifest.resolve!(doc, "release-candidate")
     assert candidate["app"]["slug"] == "example"
     assert candidate["app"]["name"] == "Candidate"
     assert candidate["app"]["identifier"] == "dev.example.candidate"
     assert candidate["public"]["paths"] == ["/"]
     assert candidate["web"]["start_path"] == "/"
-    assert candidate["public"]["bundle"] == "public/release-candidate"
+    assert candidate["public"]["bundle"] == ".fow/release-candidate/bundles/source"
     assert Manifest.resolve!(candidate) == candidate
   end
 
@@ -73,13 +70,13 @@ defmodule FogOfWar.CacheExportTest do
     end
 
     assert_raise Mix.Error, fn ->
-      Manifest.resolve!(put_in(doc, ["envs", "dev", "public"], %{"paths" => ["/../bad"]}))
+      Manifest.resolve!(put_in(doc, ["envs", "dev", "preload"], %{"paths" => ["/../bad"]}))
     end
   end
 
-  test "legacy flat manifests remain readable without an environment suffix", %{manifest: doc} do
-    legacy = doc |> Map.drop(["envs", "default_env"]) |> Map.put("schema", 1)
-    assert Manifest.resolve!(legacy)["public"]["bundle"] == "public"
+  test "old schemas are rejected", %{manifest: doc} do
+    for schema <- [1, 2],
+        do: assert_raise(Mix.Error, fn -> Manifest.resolve!(Map.put(doc, "schema", schema)) end)
   end
 
   test "binary export is decodable, indexed by path, debug-friendly and contains complete startup HTML",
@@ -142,19 +139,25 @@ defmodule FogOfWar.CacheExportTest do
     assert index["capture_origin"] == "http://127.0.0.1:47180"
   end
 
-  test "full export includes cache files and desktop generation copies them with resolved identity",
+  test "Apple bundle includes cache files and desktop generation copies them with resolved identity",
        %{manifest: doc, root: root} do
     Manifest.write!(Path.join(root, ".fow.json"), doc)
     manifest = Manifest.resolve!(doc, "release-candidate")
-    source = Path.join(root, manifest["public"]["bundle"])
-    bundle = Export.run!(manifest, root, source, fetch: &html/1)
+    source = Path.join(root, ".fow/release-candidate/bundles/apple")
+
+    bundle =
+      NativeBundle.run!(manifest, root, source, "apple",
+        fetch: fn url ->
+          String.replace(html(url), ~s(<script src="/assets/app.js"></script>), "")
+        end
+      )
 
     Generator.run!(:elixirkit, Path.join(root, ".fow.json"), Path.join(root, "desktop"),
       env: "release-candidate"
     )
 
-    for file <- bundle["cache"]["files"] do
-      assert File.read!(Path.join([root, "desktop/priv/fog_of_war", file])) ==
+    for {_url, %{"file" => file}} <- bundle["files"] do
+      assert File.read!(Path.join([root, "desktop/priv/fog_of_war/apple", file])) ==
                File.read!(Path.join(source, file))
     end
 
@@ -167,14 +170,20 @@ defmodule FogOfWar.CacheExportTest do
 
     assert tauri["identifier"] == "dev.example.candidate"
     # Even equal origins must not let a generator consume another environment's bundle.
-    bundle_file = Path.join(source, "bundle.json")
-    File.write!(bundle_file, Jason.encode!(Map.put(bundle, "environment", "dev")))
+    bundle_file = Path.join(source, "index.json")
+
+    File.write!(
+      bundle_file,
+      Jason.encode!(Map.put(Jason.decode!(File.read!(bundle_file)), "environment", "dev"))
+    )
 
     assert_raise Mix.Error, ~r/selected environment/, fn ->
       Generator.run!(
         :elixirkit,
         Path.join(root, ".fow.json"),
-        Path.join(root, "wrong-environment"), env: "release-candidate")
+        Path.join(root, "wrong-environment"),
+        env: "release-candidate"
+      )
     end
   end
 end

@@ -10,7 +10,7 @@ defmodule FogOfWar.MobileGeneratorTest do
     on_exit(fn -> File.rm_rf!(root) end)
 
     manifest = %{
-      "schema" => 2,
+      "schema" => 3,
       "default_env" => "dev",
       "envs" => %{"dev" => %{}},
       "app" => %{
@@ -19,20 +19,17 @@ defmodule FogOfWar.MobileGeneratorTest do
         "identifier" => "dev.test.frontier",
         "version" => "0.1.0"
       },
-      "web" => %{"origin" => "https://frontier.example", "start_path" => "/"},
-      "public" => %{
-        "paths" => ["/"],
-        "static_root" => "priv/static",
-        "asset_directories" => [],
-        "bundle" => ".fow/public"
-      },
+      "web" => %{"origin" => "https://frontier.example"},
+      "startup" => %{"path" => "/"},
+      "preload" => %{"paths" => []},
+      "assets" => %{"directories" => []},
       "mob" => %{"platforms" => ["android", "ios"]}
     }
 
     path = Path.join(root, ".fow.json")
     Manifest.write!(path, manifest)
     resolved = Manifest.resolve!(manifest)
-    native_root = Path.join(root, ".fow/native/dev")
+    native_root = Path.join(root, ".fow/dev/bundles")
 
     for platform <- ["android", "ios"] do
       NativeBundle.run!(resolved, root, Path.join(native_root, platform), platform,

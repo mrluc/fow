@@ -4,7 +4,7 @@ export const DATABASE = 'fog-of-war'
 export function validSnapshot(record) {
   return Boolean(record && record.schema === 1 && typeof record.path === 'string' && record.path.startsWith('/') &&
     !record.path.startsWith('//') && !/[?#\\\0]/.test(record.path) && Number.isFinite(Date.parse(record.savedAt)) &&
-    (typeof record.html === 'string' || (record.htmlEncoding === 'gzip' && record.htmlGzip instanceof Uint8Array) ||
+    (typeof record.html === 'string' || (['gzip', 'gzip-aes-gcm'].includes(record.htmlEncoding) && record.htmlGzip instanceof Uint8Array) ||
       (record.htmlEncoding === 'gzip-base64' && typeof record.htmlGzip === 'string')))
 }
 
@@ -39,10 +39,19 @@ export function stringifyLegacy(record) {
   return JSON.stringify({...record, htmlEncoding:'gzip-base64', htmlGzip:btoa(binary)})
 }
 
-export function describeRecord(record, key = PAGE_PREFIX + record.path) {
+export function recordKey(path, userId) {
+  return userId ? JSON.stringify([userId, path]) : path
+}
+
+export function describeRecord(record, key = PAGE_PREFIX + recordKey(record.path, record.userId)) {
   const {html, htmlGzip, ...snapshot} = record
   const metadataBytes = new TextEncoder().encode(JSON.stringify(snapshot)).length
   const payloadBytes = htmlGzip instanceof Uint8Array ? htmlGzip.byteLength : new TextEncoder().encode(html || htmlGzip || '').length
   return {key, path:record.path, snapshot, valid:validSnapshot(record), bytes:metadataBytes+payloadBytes,
     raw:`${Date.now()}:${Math.random()}`}
+}
+
+
+export function isExpired(snapshot, now = Date.now()) {
+  return snapshot?.expiresAt != null && snapshot.expiresAt <= now
 }

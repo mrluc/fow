@@ -12,6 +12,10 @@ Each counter page has its own path and cached page state. Navigate from the inde
 
 The demo uses the package from the parent checkout via `{:fow, path: "../.."}`. Its normal asset import remains `import {FogOfWar, installFogOfWar} from "fow"` in `assets/js/app.js`.
 
+## Mobile quickstart
+
+See the [example apps quickstart](../../docs/guides/example-apps-quickstart.md).
+
 ## Android: commands used for the generated Counter app
 
 The current client setup is already idiomatic FoW: the shared site layout wraps the whole routed page in `FogOfWar.region`, and `assets/js/app.js` installs the exported hook/coordinator. The package owns the DevTools. The public bundle contains `/`, `/counters/one` and `/counters/two`. `/counters/three` remains normally cacheable after an online visit, but is deliberately absent from the shipped bundle.
@@ -33,8 +37,8 @@ export MIX_ARCHIVES="$ELIXIR_CLIENT_ROOT/.cache/mix-archives"
 cd /Users/mrluc/projects/vibes/elixir-client/fow/examples/basic
 
 mix fow.bundle.prepare --env android-dev --platform android
-mix fow.gen.mob --env android-dev --output .fow/apps/mob/android-dev
-cd .fow/apps/mob/android-dev
+mix fow.gen.mob --env android-dev --output .fow/android-dev/projects/mobile
+cd .fow/android-dev/projects/mobile
 mix deps.get
 
 mix mob.emulators --list --android
