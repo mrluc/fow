@@ -151,7 +151,7 @@ test('inspector reset respawns a connected player and clears old cached explorat
   await expect(page.locator('#frontier-death')).toContainText('Respawned');
   await expect(page.locator('[data-bar="health"]')).toHaveJSProperty('value', 100);
   await expect(page.locator('[data-lives-count]')).toHaveText('3');
-  await expect.poll(() => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.length)).toBe(1);
+  await expect.poll(() => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.map(row=>row.path))).toEqual([new URL(page.url()).pathname]);
   await inspector.close();
 });
 

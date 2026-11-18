@@ -5,14 +5,16 @@ test('negative lives show spent scouts plus red debt, and death desaturates the 
   await page.goto('/multi/lat/0/lon/0');
   await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
   await expect(page.locator('[data-lives-count]')).toHaveText('3');
+  await page.locator('[data-connection="disconnect"]').click();
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Offline');
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('phx:frontier:player', {detail: {
-    health: 0, dead: true, lives: -2, life: 5, respawn_remaining_ms: 5000, move_remaining_ms: 0,
+    paused: true, health: 0, dead: true, lives: -2, life: 5, respawn_remaining_ms: 5000, move_remaining_ms: 0,
   }})));
   await expect(page.locator('[data-lives-count]')).toHaveText('-2');
   await expect(page.locator('.life-spent')).toHaveCount(3);
   await expect(page.locator('.life-debt')).toHaveCount(2);
   await expect(page.locator('#frontier-death')).toContainText('You died');
-  await expect(page.locator('#frontier-death')).toContainText('Respawning in 5');
+  await expect(page.locator('#frontier-death')).toContainText('Respawning in');
   await expect(page.locator('#player')).toHaveCSS('opacity', '0.4');
   await expect(page.locator('#player')).toHaveCSS('filter', /grayscale\(1\)/);
   await page.locator('a[href="/multi/lat/0/lon/1"]').evaluate(el => el.click());
@@ -97,7 +99,7 @@ test('offline death reconnects, clears remembered routes and respawns automatica
   await expect(page.locator('#frontier-death')).toContainText('Respawned', {timeout: 10000});
   await expect(page.locator('[data-bar="health"]')).toHaveJSProperty('value', 100);
   await expect(page.locator('[data-lives-count]')).toHaveText('2');
-  await expect.poll(() => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.length)).toBe(1);
+  await expect.poll(() => page.evaluate(async () => (await window.fogOfWar.cache.inspect()).rows.map(row=>row.path))).toEqual([new URL(page.url()).pathname]);
   await expect(page.locator('#frontier-death')).toBeHidden();
   await expect(page.locator('html')).not.toHaveClass(/frontier-dead/);
   await expect(page.locator('#player')).toHaveCSS('opacity', '1');

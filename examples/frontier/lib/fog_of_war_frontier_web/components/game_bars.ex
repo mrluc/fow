@@ -29,6 +29,8 @@ defmodule FogOfWarFrontierWeb.GameBars do
       </nav>
       <div class="lives-row">
         <span>Lives</span><output data-lives-count>{@rules.initial_lives}</output><span
+          id="frontier-life-icons"
+          phx-update="ignore"
           data-lives-icons
           aria-hidden="true"
         ><img

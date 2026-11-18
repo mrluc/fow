@@ -202,11 +202,21 @@ export const FrontierPlayer = {
         const notify = !fresh_join && clear
         if (clear) {
           const cache = window.fogOfWar.cache
+          await window.frontierPreload
           await cache.flush()
           const {rows} = await cache.inspect()
           for (const row of rows) if (row.path.startsWith('/multi/')) await cache.remove(row.path)
           sessionStorage.setItem(marker, String(life))
         }
+        if (notify) window.addEventListener('phx:navigate', async () => {
+          await window.fogOfWar.cache.flush()
+          const {rows} = await window.fogOfWar.cache.inspect()
+          for (const row of rows) {
+            if (row.path.startsWith('/multi/') && row.path !== location.pathname) {
+              await window.fogOfWar.cache.remove(row.path)
+            }
+          }
+        }, {once: true})
         this.pushEvent('respawn_ready', {life, notify})
       } catch (error) {
         console.error('[Frontier] Could not clear remembered routes for respawn', error)
