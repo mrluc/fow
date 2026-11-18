@@ -113,7 +113,7 @@ test('online capture replaces legacy element/build keys with one record per rout
   });
   await page.goto('/'); await ready(page);
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('fog-of-war:page:')).sort())).toEqual([]);
-  expect(await page.evaluate(() => window.fogOfWar.cache.getRecord('/').then(record=>record?.regionId))).toBe('counter-site');
+  await expect.poll(() => page.evaluate(() => window.fogOfWar.cache.getRecord('/').then(record=>record?.regionId))).toBe('counter-site');
 });
 
 test('transparency is opt-in, toggle survives reload and routing, and icon controls show connection state',async({page})=>{
