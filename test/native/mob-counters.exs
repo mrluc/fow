@@ -63,7 +63,7 @@ end
 
 Mix.Task.run("app.config")
 
-unless Mix.Project.config()[:app] == :counters_mobile do
+if Mix.Project.config()[:app] != :counters_mobile do
   raise "Run this script from the generated :counters_mobile project"
 end
 
@@ -83,7 +83,7 @@ package = MobDev.Config.bundle_id()
   ])
 
 component = resolved |> String.split("\n", trim: true) |> Enum.find(&String.contains?(&1, "/"))
-unless component, do: raise("Android could not resolve the app's launch activity")
+if !component, do: raise("Android could not resolve the app's launch activity")
 
 MobDev.Connector.start_epmd()
 {_, 0} = System.cmd("adb", ["-s", serial, "reverse", "tcp:4369", "tcp:4369"])
@@ -96,9 +96,9 @@ prefix = Atom.to_string(Mix.Project.config()[:app]) <> "_android"
 deadline = System.monotonic_time(:millisecond) + 20_000
 
 await_dist = fn recur ->
-  unless Enum.any?(MobDev.Tunnel.epmd_names(), fn {name, _} ->
-           String.starts_with?(name, prefix)
-         end) do
+  if !Enum.any?(MobDev.Tunnel.epmd_names(), fn {name, _} ->
+       String.starts_with?(name, prefix)
+     end) do
     if System.monotonic_time(:millisecond) >= deadline,
       do: raise("App did not register its development connection")
 
@@ -117,7 +117,7 @@ await_dist.(await_dist)
     name: String.to_atom("mob_counters_qa_#{System.pid()}@127.0.0.1")
   )
 
-unless length(devices) == 1, do: raise("Expected one connected Android app")
+if length(devices) != 1, do: raise("Expected one connected Android app")
 node = hd(devices).node
 
 wait = fn label, predicate ->
@@ -190,7 +190,7 @@ try do
 
   import = evaluate.("window.__counterBundle")
 
-  unless import["total"] == 3 && import["stored"] == 3,
+  if !(import["total"] == 3 && import["stored"] == 3),
     do: raise("Expected exactly three imported public pages, got #{inspect(import)}")
 
   evaluate.(
@@ -198,9 +198,9 @@ try do
   )
 
   wait.("uncached third counter check", fn -> evaluate.("window.__threeCached !== undefined") end)
-  unless evaluate.("window.__threeCached") == false, do: raise("Third counter was bundled")
+  if evaluate.("window.__threeCached") != false, do: raise("Third counter was bundled")
 
-  unless evaluate.("document.documentElement.classList.contains('fow-offline')"),
+  if !evaluate.("document.documentElement.classList.contains('fow-offline')"),
     do: raise("Counter did not start offline")
 
   evaluate.("document.querySelector('a[href=\"/counters/three\"]').click(); true")
@@ -214,7 +214,7 @@ try do
   evaluate.("document.querySelector('a[href=\"/counters/one\"]').click(); true")
   wait.("cached Counter one", fn -> evaluate.("location.pathname === '/counters/one'") end)
 
-  unless evaluate.("document.querySelector('#counter-title')?.textContent === 'Counter one'"),
+  if !evaluate.("document.querySelector('#counter-title')?.textContent === 'Counter one'"),
     do: raise("Cached Counter one did not render")
 
   evaluate.("document.querySelector('a.back-link[href=\"/\"]').click(); true")
@@ -226,7 +226,7 @@ try do
   evaluate.("document.querySelector('a[href=\"/counters/two\"]').click(); true")
   wait.("cached Counter two", fn -> evaluate.("location.pathname === '/counters/two'") end)
 
-  unless evaluate.("document.querySelector('#counter-title')?.textContent === 'Counter two'"),
+  if !evaluate.("document.querySelector('#counter-title')?.textContent === 'Counter two'"),
     do: raise("Cached Counter two did not render")
 
   evaluate.(
@@ -235,10 +235,10 @@ try do
 
   wait.("offline increment attempt", fn -> evaluate.("window.__offlineAfter !== undefined") end)
 
-  unless evaluate.(
-           "document.querySelector('#increment-counter').disabled && window.__offlineAfter === window.__offlineCount"
-         ),
-         do: raise("Offline increment changed the Counter")
+  if !evaluate.(
+       "document.querySelector('#increment-counter').disabled && window.__offlineAfter === window.__offlineCount"
+     ),
+     do: raise("Offline increment changed the Counter")
 
   {_, 0} = System.cmd("adb", ["-s", serial, "reverse", "tcp:47180", "tcp:47180"])
 
@@ -253,7 +253,7 @@ try do
     evaluate.("Number(document.querySelector('#count').textContent) === #{before + 1}")
   end)
 
-  unless evaluate.("location.pathname") == "/counters/two",
+  if evaluate.("location.pathname") != "/counters/two",
     do: raise("Recovery changed the selected route")
 
   IO.puts(
@@ -266,7 +266,7 @@ try do
     evaluate.("location.pathname === '/' && !!window.liveSocket?.main?.isConnected()")
   end)
 
-  unless evaluate.("!window.fogOfWar.cache.find(new URL('/counters/three',location.href))"),
+  if !evaluate.("!window.fogOfWar.cache.find(new URL('/counters/three',location.href))"),
     do: raise("Demo's third counter unexpectedly cached")
 
   IO.puts("RETURN INDEX: #{evaluate.("location.pathname")}")

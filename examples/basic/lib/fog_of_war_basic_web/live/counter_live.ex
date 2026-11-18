@@ -34,7 +34,7 @@ defmodule FogOfWarBasicWeb.CounterLive do
 
   def handle_info({:counter_changed, id, count}, socket) do
     if socket.assigns.id == id,
-      do: {:noreply, update(socket, :count, &max(&1, count))},
+      do: {:noreply, assign(socket, :count, count)},
       else: {:noreply, socket}
   end
 

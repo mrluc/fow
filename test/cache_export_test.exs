@@ -1,6 +1,10 @@
 defmodule FogOfWar.CacheExportTest do
   use ExUnit.Case, async: false
-  alias FogOfWar.Wrapper.{CacheExport, NativeBundle, Generator, Manifest}
+
+  alias FogOfWar.Wrapper.CacheExport
+  alias FogOfWar.Wrapper.Generator
+  alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.NativeBundle
 
   setup do
     root = Path.join(System.tmp_dir!(), "fow-cache-export-#{System.unique_integer([:positive])}")
@@ -152,9 +156,7 @@ defmodule FogOfWar.CacheExportTest do
         end
       )
 
-    Generator.run!(:elixirkit, Path.join(root, ".fow.json"), Path.join(root, "desktop"),
-      env: "release-candidate"
-    )
+    Generator.run!(:elixirkit, Path.join(root, ".fow.json"), Path.join(root, "desktop"), env: "release-candidate")
 
     for {_url, %{"file" => file}} <- bundle["files"] do
       assert File.read!(Path.join([root, "desktop/priv/fog_of_war/apple", file])) ==
@@ -166,7 +168,7 @@ defmodule FogOfWar.CacheExportTest do
     assert resolved["environment"] == "release-candidate"
 
     tauri =
-      Path.join(root, "desktop/src-tauri/tauri.conf.json") |> File.read!() |> Jason.decode!()
+      root |> Path.join("desktop/src-tauri/tauri.conf.json") |> File.read!() |> Jason.decode!()
 
     assert tauri["identifier"] == "dev.example.candidate"
     # Even equal origins must not let a generator consume another environment's bundle.

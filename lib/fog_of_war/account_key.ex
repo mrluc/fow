@@ -15,18 +15,18 @@ defmodule FogOfWar.AccountKey do
   def derive!(secret, account_scope, device_id, version \\ 1)
 
   def derive!(secret, account_scope, device_id, version)
-      when is_binary(secret) and byte_size(secret) >= 32 and is_binary(account_scope) and
-             account_scope != "" and is_binary(device_id) and is_integer(version) and version > 0 do
-    unless Regex.match?(
-             ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/i,
-             device_id
-           ),
-           do: raise(ArgumentError, "expected a random device UUID")
+      when is_binary(secret) and byte_size(secret) >= 32 and is_binary(account_scope) and account_scope != "" and
+             is_binary(device_id) and is_integer(version) and version > 0 do
+    if !Regex.match?(
+         ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/i,
+         device_id
+       ),
+       do: raise(ArgumentError, "expected a random device UUID")
 
     context =
       Jason.encode!(["fow-account-cache", version, account_scope, String.downcase(device_id)])
 
-    :crypto.mac(:hmac, :sha256, secret, context) |> Base.encode64()
+    :hmac |> :crypto.mac(:sha256, secret, context) |> Base.encode64()
   end
 
   def derive!(_, _, _, _), do: raise(ArgumentError, "invalid account key inputs")

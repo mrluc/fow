@@ -32,7 +32,7 @@ defmodule FogOfWar.Wrapper.Output do
       validate!(output, opts[:protected] || [])
 
       if File.exists?(output) do
-        unless opts[:force], do: Mix.raise("Destination appeared during generation: #{output}")
+        if !opts[:force], do: Mix.raise("Destination appeared during generation: #{output}")
         File.rename!(output, backup)
       end
 
@@ -58,21 +58,22 @@ defmodule FogOfWar.Wrapper.Output do
     if match?({:ok, %{type: :symlink}}, File.lstat(output)),
       do: Mix.raise("Refusing a symlink destination: #{output}")
 
-    output
-    |> Path.split()
-    |> Enum.reduce("/", fn part, parent ->
-      path = Path.join(parent, part)
-      # macOS exposes these standard system aliases; user-created aliases are
-      # rejected so --force never reaches through them to delete another tree.
-      if match?({:ok, %{type: :symlink}}, File.lstat(path)) &&
-           path not in ["/tmp", "/var", "/etc"],
-         do: Mix.raise("Refusing a symlink in the destination path: #{path}")
+    _checked_path =
+      output
+      |> Path.split()
+      |> Enum.reduce("/", fn part, parent ->
+        path = Path.join(parent, part)
+        # macOS exposes these standard system aliases; user-created aliases are
+        # rejected so --force never reaches through them to delete another tree.
+        if match?({:ok, %{type: :symlink}}, File.lstat(path)) &&
+             path not in ["/tmp", "/var", "/etc"],
+           do: Mix.raise("Refusing a symlink in the destination path: #{path}")
 
-      path
-    end)
+        path
+      end)
 
     resolved = resolve(output)
-    roots = ["/", System.user_home!() | protected] |> Enum.map(&resolve/1)
+    roots = Enum.map(["/", System.user_home!() | protected], &resolve/1)
 
     if Enum.any?(roots, fn root ->
          resolved == root || String.starts_with?(root, resolved <> "/")

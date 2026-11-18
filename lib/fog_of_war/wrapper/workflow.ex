@@ -6,7 +6,10 @@ defmodule FogOfWar.Wrapper.Workflow do
 
   The desktop Mix tasks call these functions directly. `desktop!/2` composes `NativeBundle`, `Generator`, the build function and the install function.
   """
-  alias FogOfWar.Wrapper.{Generator, Manifest, NativeBundle, Output}
+  alias FogOfWar.Wrapper.Generator
+  alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.NativeBundle
+  alias FogOfWar.Wrapper.Output
 
   @doc "Resolve the generated project directory for a target and manifest environment."
   def project_path(manifest_path, target, opts \\ []) do
@@ -28,7 +31,7 @@ defmodule FogOfWar.Wrapper.Workflow do
     project = Path.expand(project)
     manifest = Manifest.read!(Path.join(project, ".fow.json"))
 
-    unless File.regular?(Path.join(project, "build.sh")),
+    if !File.regular?(Path.join(project, "build.sh")),
       do: Mix.raise("No build.sh in generated project: #{project}")
 
     target =
@@ -41,18 +44,18 @@ defmodule FogOfWar.Wrapper.Workflow do
     app =
       Path.join([target, "release/bundle/macos", manifest["app"]["name"] <> ".app"])
 
-    unless File.dir?(app), do: Mix.raise("Build completed but the app was not found: #{app}")
+    if !File.dir?(app), do: Mix.raise("Build completed but the app was not found: #{app}")
     app
   end
 
   @doc "Copy an existing .app into the Applications directory and register it with Spotlight."
   def install_osx_local!(app, opts \\ []) do
-    unless (opts[:os] || :os.type()) == {:unix, :darwin},
+    if (opts[:os] || :os.type()) != {:unix, :darwin},
       do: Mix.raise("Local macOS installation requires macOS")
 
     app = Path.expand(app)
 
-    unless String.ends_with?(app, ".app") && File.regular?(Path.join(app, "Contents/Info.plist")),
+    if !(String.ends_with?(app, ".app") && File.regular?(Path.join(app, "Contents/Info.plist"))),
       do: Mix.raise("Expected a built .app containing Contents/Info.plist: #{app}")
 
     applications =
@@ -80,7 +83,7 @@ defmodule FogOfWar.Wrapper.Workflow do
 
   @doc "Prepare an Apple bundle, generate and build the desktop project, then install the app."
   def desktop!(manifest_path, opts \\ []) do
-    unless (opts[:os] || :os.type()) == {:unix, :darwin},
+    if (opts[:os] || :os.type()) != {:unix, :darwin},
       do: Mix.raise("Desktop build/install convenience requires macOS")
 
     manifest_path = Path.expand(manifest_path)

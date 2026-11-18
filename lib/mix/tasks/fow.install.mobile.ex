@@ -1,6 +1,4 @@
 defmodule Mix.Tasks.Fow.Install.Mobile do
-  use Mix.Task
-
   @shortdoc "Install an APK or simulator .app"
   @moduledoc """
   Install an existing artifact on Android or an iOS simulator.
@@ -10,6 +8,8 @@ defmodule Mix.Tasks.Fow.Install.Mobile do
 
   Use `--device` to choose an adb serial or iOS simulator ID.
   """
+
+  use Mix.Task
 
   def run(args) do
     {opts, rest, invalid} = OptionParser.parse(args, strict: [app: :string, device: :string])
@@ -22,12 +22,12 @@ defmodule Mix.Tasks.Fow.Install.Mobile do
     {tool, arguments} =
       case Path.extname(app) do
         ".apk" ->
-          unless File.regular?(app), do: Mix.raise("APK does not exist: #{app}")
+          if !File.regular?(app), do: Mix.raise("APK does not exist: #{app}")
           serial = if opts[:device], do: ["-s", opts[:device]], else: []
           {"adb", serial ++ ["install", "-r", app]}
 
         ".app" ->
-          unless File.dir?(app), do: Mix.raise("App does not exist: #{app}")
+          if !File.dir?(app), do: Mix.raise("App does not exist: #{app}")
           {"xcrun", ["simctl", "install", opts[:device] || "booted", app]}
 
         _ ->

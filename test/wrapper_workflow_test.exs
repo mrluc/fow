@@ -1,6 +1,11 @@
 defmodule FogOfWar.WrapperWorkflowTest do
   use ExUnit.Case, async: false
-  alias FogOfWar.Wrapper.{NativeBundle, Generator, Manifest, Output, Workflow}
+
+  alias FogOfWar.Wrapper.Generator
+  alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.NativeBundle
+  alias FogOfWar.Wrapper.Output
+  alias FogOfWar.Wrapper.Workflow
 
   setup do
     root = Path.join(System.tmp_dir!(), "fow-workflow-#{System.unique_integer([:positive])}")
@@ -48,9 +53,7 @@ defmodule FogOfWar.WrapperWorkflowTest do
     manifest: manifest,
     path: path
   } do
-    NativeBundle.run!(manifest, root, Path.join(root, ".fow/default/bundles/apple"), "apple",
-      fetch: &html/1
-    )
+    NativeBundle.run!(manifest, root, Path.join(root, ".fow/default/bundles/apple"), "apple", fetch: &html/1)
 
     output = Path.join(root, "desktop")
     Generator.run!(:elixirkit, path, output)
@@ -101,9 +104,7 @@ defmodule FogOfWar.WrapperWorkflowTest do
     manifest: manifest,
     path: path
   } do
-    NativeBundle.run!(manifest, root, Path.join(root, ".fow/default/bundles/apple"), "apple",
-      fetch: &html/1
-    )
+    NativeBundle.run!(manifest, root, Path.join(root, ".fow/default/bundles/apple"), "apple", fetch: &html/1)
 
     output = Path.join(root, "desktop")
     Generator.run!(:elixirkit, path, output)

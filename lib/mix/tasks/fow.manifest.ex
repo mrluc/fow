@@ -1,5 +1,4 @@
 defmodule Mix.Tasks.Fow.Manifest do
-  use Mix.Task
   @shortdoc "Derive a reviewable .fow.json manifest from the current Phoenix project"
   @moduledoc """
   Create .fow.json before building a native app.
@@ -12,6 +11,10 @@ defmodule Mix.Tasks.Fow.Manifest do
 
   Run this once to create the configuration used by the other tasks. The other tasks read the manifest; they do not invoke this generator automatically.
   """
+  use Mix.Task
+
+  alias FogOfWar.Wrapper.Manifest
+
   def run(args) do
     {opts, rest, invalid} =
       OptionParser.parse(args,
@@ -31,9 +34,9 @@ defmodule Mix.Tasks.Fow.Manifest do
       do: Mix.raise("Invalid manifest arguments: #{inspect(rest ++ invalid)}")
 
     Mix.Task.run("compile")
-    manifest = FogOfWar.Wrapper.Manifest.discover(opts)
+    manifest = Manifest.discover(opts)
     path = opts[:output] || ".fow.json"
-    FogOfWar.Wrapper.Manifest.write!(path, manifest, opts[:force] || false)
+    Manifest.write!(path, manifest, opts[:force] || false)
 
     Mix.shell().info(
       "Created #{path}. Review identity, origin, icons and startup.path and preload.paths before exporting."

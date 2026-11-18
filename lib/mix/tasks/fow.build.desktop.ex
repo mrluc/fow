@@ -1,5 +1,4 @@
 defmodule Mix.Tasks.Fow.Build.Desktop do
-  use Mix.Task
   @shortdoc "Build a generated ElixirKit desktop project"
   @moduledoc """
   Compile an already generated desktop project on macOS.
@@ -12,14 +11,18 @@ defmodule Mix.Tasks.Fow.Build.Desktop do
 
   This is the build step used by `mix fow.desktop`. Both call `FogOfWar.Wrapper.Workflow.build_elixirkit!/2` directly. Use it separately after generating or editing a desktop project.
   """
+  use Mix.Task
+
+  alias FogOfWar.Wrapper.Workflow
+
   def run(args) do
     {opts, rest, invalid} =
       OptionParser.parse(args, strict: [manifest: :string, env: :string, output: :string])
 
     if rest != [] || invalid != [], do: Mix.raise("Invalid build arguments")
     manifest = Path.expand(opts[:manifest] || ".fow.json")
-    project = FogOfWar.Wrapper.Workflow.project_path(manifest, :elixirkit, opts)
-    app = FogOfWar.Wrapper.Workflow.build_elixirkit!(project)
+    project = Workflow.project_path(manifest, :elixirkit, opts)
+    app = Workflow.build_elixirkit!(project)
     Mix.shell().info("Built #{app}")
   end
 end

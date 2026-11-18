@@ -13,10 +13,10 @@ jobs:
         with:
           node-version: '22'
       - run: mix local.hex --force && mix local.rebar --force
-      - run: mix deps.get && mix test
-      - run: mix deps.get && mix assets.setup && mix assets.build && mix test
+      - run: mix deps.get && mix format --check-formatted && mix test --warnings-as-errors
+      - run: mix deps.get && mix assets.setup && mix assets.build && mix test --warnings-as-errors
         working-directory: examples/basic
-      - run: mix deps.get && mix assets.setup && mix assets.build && mix test
+      - run: mix deps.get && mix assets.setup && mix assets.build && mix test --warnings-as-errors
         working-directory: examples/frontier
       - run: npm ci --prefix test/browser
       - run: npx --prefix test/browser playwright install --with-deps chromium

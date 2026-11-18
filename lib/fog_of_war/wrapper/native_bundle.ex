@@ -6,11 +6,12 @@ defmodule FogOfWar.Wrapper.NativeBundle do
 
   Called by `mix fow.bundle.prepare` and directly by `FogOfWar.Wrapper.Workflow.desktop!/2`. It uses `CacheExport` for routes, `Export` for assets and `InlineAssets` for Apple startup documents.
   """
-  alias FogOfWar.Wrapper.{CacheExport, Export, InlineAssets}
+  alias FogOfWar.Wrapper.CacheExport
+  alias FogOfWar.Wrapper.Export
+  alias FogOfWar.Wrapper.InlineAssets
 
   @doc "Capture public routes, prepare startup HTML and assets for the selected platform, and return the native resource manifest. Supply a resolved manifest and a fresh output directory."
-  def run!(manifest, project, output, platform, opts \\ [])
-      when platform in ["android", "ios", "apple"] do
+  def run!(manifest, project, output, platform, opts \\ []) when platform in ["android", "ios", "apple"] do
     if File.exists?(output), do: Mix.raise("Native bundle destination exists: #{output}")
     stage = output <> ".tmp-#{System.unique_integer([:positive])}"
 
@@ -18,8 +19,8 @@ defmodule FogOfWar.Wrapper.NativeBundle do
       index = CacheExport.run!(manifest, stage, opts)
 
       references =
-        Enum.reduce(
-          index["pages"],
+        index["pages"]
+        |> Enum.reduce(
           references(File.read!(Path.join(stage, "startup.html"))),
           fn {_, page}, refs ->
             html = :zlib.gunzip(File.read!(Path.join(stage, page["file"])))
@@ -72,7 +73,7 @@ defmodule FogOfWar.Wrapper.NativeBundle do
       pages =
         Map.new(index["pages"], fn {path, record} ->
           file = Path.join(stage, record["file"])
-          html = File.read!(file) |> :zlib.gunzip() |> rewrite.()
+          html = file |> File.read!() |> :zlib.gunzip() |> rewrite.()
           gzip = :zlib.gzip(html)
           File.write!(file, gzip)
 
@@ -166,9 +167,7 @@ defmodule FogOfWar.Wrapper.NativeBundle do
   defp references(html) do
     html
     |> Floki.parse_document!()
-    |> Floki.find(
-      "script[src],link[rel=stylesheet],link[rel=icon],link[rel=preload],img[src],source[src],video[poster]"
-    )
+    |> Floki.find("script[src],link[rel=stylesheet],link[rel=icon],link[rel=preload],img[src],source[src],video[poster]")
     |> Enum.flat_map(fn {_, attrs, _} ->
       for {key, value} <- attrs, key in ["src", "href", "poster"], do: value
     end)
@@ -200,11 +199,8 @@ defmodule FogOfWar.Wrapper.NativeBundle do
     |> Floki.raw_html()
   end
 
-  defp same_origin?(uri, origin),
-    do: URI.to_string(%{uri | path: nil, query: nil, fragment: nil}) == origin
+  defp same_origin?(uri, origin), do: URI.to_string(%{uri | path: nil, query: nil, fragment: nil}) == origin
 
   defp suffix(uri),
-    do:
-      if(uri.query, do: "?" <> uri.query, else: "") <>
-        if(uri.fragment, do: "#" <> uri.fragment, else: "")
+    do: if(uri.query, do: "?" <> uri.query, else: "") <> if(uri.fragment, do: "#" <> uri.fragment, else: "")
 end

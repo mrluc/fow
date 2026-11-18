@@ -62,7 +62,7 @@ cd .fow/android-dev/projects/mobile
 ./build.sh --android
 ```
 
-The generated app is **Frontier**, with application ID `dev.fogofwar.frontier`. It fetches the pinned WebView package from Git, includes the public startup document, compressed routes and artwork, and has no wrapper toolbar. Its HomeScreen contains no test hooks. The repository is private for now, so dependency fetching requires GitHub SSH access. The build uses the normal Mob toolchain and existing runtime caches; it does not use the older Counter test host.
+The generated app is **Frontier**, with application ID `dev.fogofwar.frontier`. It fetches the pinned WebView package from Git, includes the public startup document, compressed routes and artwork, and has no wrapper toolbar. Its HomeScreen contains no test hooks. The generator fetches the public repository over HTTPS. The build uses the normal Mob toolchain and existing runtime caches; it does not use the older Counter test host.
 
 From the generated project directory, this native test clears that development app's WebView data, opens it without website forwarding, checks the bundled routes and canvas-readable artwork, then restores forwarding and requires recovery on the chosen route followed by live navigation:
 

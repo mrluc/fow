@@ -1,6 +1,9 @@
 defmodule FogOfWar.MobileGeneratorTest do
   use ExUnit.Case, async: true
-  alias FogOfWar.Wrapper.{Generator, Manifest, NativeBundle}
+
+  alias FogOfWar.Wrapper.Generator
+  alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.NativeBundle
 
   setup do
     root =
@@ -128,7 +131,7 @@ defmodule FogOfWar.MobileGeneratorTest do
     output = Path.join(ctx.root, "default-generated")
     Generator.run!(:mob, ctx.path, output, scaffold: ctx.scaffold)
     mix = File.read!(Path.join(output, "mix.exs"))
-    assert mix =~ ~s(git: "git@github.com:mrluc/fow_webview_mob.git")
+    assert mix =~ ~s(git: "https://github.com/mrluc/fow_webview_mob.git")
     assert mix =~ ~s(ref: "1be07da3604a64bc6ef11c87858c3c9ad372e80b")
   end
 
@@ -180,7 +183,7 @@ defmodule FogOfWar.MobileGeneratorTest do
     assert File.read!(Path.join(output, "keep.txt")) == "old project"
     File.write!(index_file, original)
     native_file = Path.join(ctx.native_root, "android/native.json")
-    native = File.read!(native_file) |> Jason.decode!()
+    native = native_file |> File.read!() |> Jason.decode!()
     File.write!(native_file, native |> Map.put("startup", "../secret") |> Jason.encode!())
 
     assert_raise Mix.Error, ~r/project-relative/, fn ->

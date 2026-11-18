@@ -70,12 +70,18 @@ defmodule FogOfWar do
       post "/_fow/account-key", FogOfWar.AccountKeyEndpoint, []
 
   FoW reuses the matching key in IndexedDB. If it is missing or belongs to
-  another account, FoW requests a key when a signed-in region renders.
-  There is no separate login call.
+  another account, FoW requests a key the first time a signed-in region renders.
 
-  ### Clear the key on logout
+  ### Locking the cache on logout
 
-  Wrap your existing logout control with `logout/1`. FoW clears the stored
+  There are two ways to lock the per-user cache: in the UI when the users click
+  a logout button of some sort, or programmatically from the server, from
+  any connected LiveView.
+
+  The preferred approach is in the UI, because there's no chance for eg.
+  a redirect to accidentally outrun the clearing action.
+
+  **In the UI**: Wrap your existing logout control with `logout/1`. FoW clears the stored
   account key before forwarding the click or form submission. Phoenix still
   handles the session and any cross-tab refreshes.
 
@@ -83,13 +89,12 @@ defmodule FogOfWar do
         <.link href={~p"/users/log-out"} method="delete">Log out</.link>
       </FogOfWar.logout>
 
-  A LiveView can also request the same local clear with
+  **From a LiveView**: a LiveView can also request the same local clear with
   `push_event(socket, "fow:logout", %{})`. FoW listens even when the page has no
-  region. Let the browser finish the clear before redirecting. If you need
+  region active, so this can be done from any LiveView.
+  Let the browser finish the clear before redirecting. If you need
   completion, listen for the browser event `fog-of-war:account-locked`.
-  Your app still owns the server session. Scripts running while the account
-  is unlocked can read its cached content. See the
-  [upgrade and logout notes](readme.html#optional-account-keys).
+  See the [upgrade and logout notes](readme.html#optional-account-keys).
 
   ## Cache expiry
   To expire the saved copy two hours after its last online capture:
@@ -131,7 +136,16 @@ defmodule FogOfWar do
 
   Each time they visit that route, it's cached in the browser.
 
-  For account scoping and logout setup, see the module’s cache security guide.
+  For account scoping and logout setup, use the following pattern,
+  but also see this module's docs on cache security!
+
+      <FogOfWar.region
+        user_id={@current_user && @current_user.id}
+        require_user_id
+      >
+        <h1>Settings</h1>
+        <p>{@current_user && @current_user.email}</p>
+      </FogOfWar.region>
 
   To expire the saved copy two hours after its last online capture:
 
@@ -192,8 +206,7 @@ defmodule FogOfWar do
 
   attr(:max_age, :any,
     default: nil,
-    doc:
-      "A positive ISO 8601 duration string, Duration struct, or integer milliseconds. Omit for no expiry."
+    doc: "A positive ISO 8601 duration string, Duration struct, or integer milliseconds. Omit for no expiry."
   )
 
   attr(:class, :string, default: nil, doc: "CSS classes for the rendered section.")
@@ -228,16 +241,10 @@ defmodule FogOfWar do
   end
 
   defp max_age_ms!(milliseconds)
-       when is_integer(milliseconds) and milliseconds > 0 and
-              milliseconds <= 8_000_000_000_000_000,
-       do: milliseconds
+       when is_integer(milliseconds) and milliseconds > 0 and milliseconds <= 8_000_000_000_000_000, do: milliseconds
 
   defp max_age_ms!(_),
-    do:
-      raise(
-        ArgumentError,
-        "max-age must be a positive ISO 8601 duration, Duration struct, or integer milliseconds"
-      )
+    do: raise(ArgumentError, "max-age must be a positive ISO 8601 duration, Duration struct, or integer milliseconds")
 
   @doc """
   Opens a floating panel for inspecting saved pages and testing offline navigation.

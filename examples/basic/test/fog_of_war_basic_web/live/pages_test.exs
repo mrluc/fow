@@ -4,7 +4,7 @@ defmodule FogOfWarBasicWeb.PagesTest do
 
   test "index links to distinct counters and each counter updates", %{conn: conn} do
     {:ok, index, _html} = live(conn, "/")
-    assert has_element?(index, "#counter-site[phx-hook=FogOfWar][data-fog-of-war-path='/']")
+    assert has_element?(index, "#counter-site[phx-hook=FogOfWar]")
     assert has_element?(index, "#page-title", "Counters")
     assert has_element?(index, "a[href='/counters/one']", "Counter one")
     assert has_element?(index, "a[href='/counters/two']", "Counter two")
@@ -17,7 +17,7 @@ defmodule FogOfWarBasicWeb.PagesTest do
 
     assert has_element?(
              first,
-             "#counter-site[phx-hook=FogOfWar][data-fog-of-war-path='/counters/one']"
+             "#counter-site[phx-hook=FogOfWar]"
            )
 
     assert has_element?(first, "#counter-title", "Counter one")

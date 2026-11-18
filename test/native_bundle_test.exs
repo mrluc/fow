@@ -1,5 +1,6 @@
 defmodule FogOfWar.NativeBundleTest do
   use ExUnit.Case, async: true
+
   alias FogOfWar.Wrapper.NativeBundle
 
   setup do
@@ -46,7 +47,7 @@ defmodule FogOfWar.NativeBundleTest do
     assert html =~ "https://example.com/assets/app.js"
     assert html =~ "__fog_of_war_bundle/boot.js"
     refute html =~ "Open live site"
-    index = File.read!(Path.join(root, "index.json")) |> Jason.decode!()
+    index = root |> Path.join("index.json") |> File.read!() |> Jason.decode!()
 
     for {_, record} <- index["pages"] do
       bytes = File.read!(Path.join(root, record["file"]))
@@ -72,7 +73,7 @@ defmodule FogOfWar.NativeBundleTest do
     css = File.read!(Path.join(root, "assets/assets/app.css"))
     assert css =~ "fog-of-war-assets://bundle/assets/terrain.css"
     assert css =~ "fog-of-war-assets://bundle/assets/tree.png"
-    index = File.read!(Path.join(root, "index.json")) |> Jason.decode!()
+    index = root |> Path.join("index.json") |> File.read!() |> Jason.decode!()
     assert index["origin"] == "https://example.com"
     record = index["pages"]["/two"]
     bytes = File.read!(Path.join(root, record["file"]))
@@ -100,8 +101,8 @@ defmodule FogOfWar.NativeBundleTest do
       assert File.read!(Path.join(apple_root, file)) == File.read!(Path.join(ios_root, file))
     end
 
-    apple_index = File.read!(Path.join(apple_root, "index.json")) |> Jason.decode!()
-    ios_index = File.read!(Path.join(ios_root, "index.json")) |> Jason.decode!()
+    apple_index = apple_root |> Path.join("index.json") |> File.read!() |> Jason.decode!()
+    ios_index = ios_root |> Path.join("index.json") |> File.read!() |> Jason.decode!()
     assert apple_index["origin"] == "https://example.com"
     assert apple_index["origin"] == ios_index["origin"]
 

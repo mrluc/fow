@@ -23,10 +23,10 @@ defmodule FogOfWar.MobilePreloadTest do
     {_, 0} = System.cmd(System.find_executable("elixir"), ["prepare.exs"], cd: root)
     generated = File.read!(bridge)
     refute generated =~ " <> "
-    chunks = Regex.run(~r/listOf\((.*?)\)\.joinToString/s, generated) |> Enum.at(1)
+    chunks = ~r/listOf\((.*?)\)\.joinToString/s |> Regex.run(generated) |> Enum.at(1)
 
     encoded =
-      Regex.scan(~r/"([A-Za-z0-9+\/=]+)"/, chunks) |> Enum.map_join(fn [_, value] -> value end)
+      ~r/"([A-Za-z0-9+\/=]+)"/ |> Regex.scan(chunks) |> Enum.map_join(fn [_, value] -> value end)
 
     assert Base.decode64!(encoded) == source
     # Updating an existing marked block is also lossless and idempotent.

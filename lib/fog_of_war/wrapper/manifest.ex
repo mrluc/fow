@@ -42,7 +42,8 @@ defmodule FogOfWar.Wrapper.Manifest do
 
     routes =
       if Code.ensure_loaded?(router) && function_exported?(router, :__routes__, 0) do
-        Phoenix.Router.routes(router)
+        router
+        |> Phoenix.Router.routes()
         |> Enum.filter(&(&1.verb == :get))
         |> Enum.map(& &1.path)
         |> Enum.uniq()
@@ -60,33 +61,32 @@ defmodule FogOfWar.Wrapper.Manifest do
         &File.regular?(Path.join(static, &1))
       )
 
-    %{
-      "schema" => @schema,
-      "default_env" => "dev",
-      "envs" => %{"dev" => %{}},
-      "app" => %{
-        "name" => opts[:name] || Macro.camelize(slug),
-        "slug" => slug,
-        "identifier" => opts[:identifier] || "dev.fogofwar.#{String.replace(slug, "_", "")}",
-        "version" => config[:version] || "0.1.0",
-        "icon" => icon && Path.join(static, icon)
+    tap(
+      %{
+        "schema" => @schema,
+        "default_env" => "dev",
+        "envs" => %{"dev" => %{}},
+        "app" => %{
+          "name" => opts[:name] || Macro.camelize(slug),
+          "slug" => slug,
+          "identifier" => opts[:identifier] || "dev.fogofwar.#{String.replace(slug, "_", "")}",
+          "version" => config[:version] || "0.1.0",
+          "icon" => icon && Path.join(static, icon)
+        },
+        "web" => %{
+          "origin" => origin,
+          "endpoint" => inspect(endpoint),
+          "router" => inspect(router),
+          "discovered_routes" => routes
+        },
+        "startup" => %{"path" => "/"},
+        "preload" => %{"paths" => Enum.reject(Keyword.get_values(opts, :public), &(&1 == "/"))},
+        "assets" => %{"static_root" => static, "directories" => ["assets", "css", "fonts", "images"]},
+        "mob" => %{"platforms" => ["android", "ios"]},
+        "elixirkit" => %{"width" => 1060, "height" => 760}
       },
-      "web" => %{
-        "origin" => origin,
-        "endpoint" => inspect(endpoint),
-        "router" => inspect(router),
-        "discovered_routes" => routes
-      },
-      "startup" => %{"path" => "/"},
-      "preload" => %{"paths" => Enum.reject(Keyword.get_values(opts, :public), &(&1 == "/"))},
-      "assets" => %{
-        "static_root" => static,
-        "directories" => ["assets", "css", "fonts", "images"]
-      },
-      "mob" => %{"platforms" => ["android", "ios"]},
-      "elixirkit" => %{"width" => 1060, "height" => 760}
-    }
-    |> tap(&resolve!/1)
+      &resolve!/1
+    )
   end
 
   @doc "Read a JSON manifest, apply the selected environment and validate the result."
@@ -94,7 +94,7 @@ defmodule FogOfWar.Wrapper.Manifest do
 
   @doc "Merge a named environment over top-level defaults, then validate the result."
   def resolve!(document, env \\ nil) when is_map(document) do
-    unless document["schema"] == @schema,
+    if document["schema"] != @schema,
       do: Mix.raise("Unsupported .fow.json schema; expected 3")
 
     case Map.fetch(document, "envs") do
@@ -107,15 +107,12 @@ defmodule FogOfWar.Wrapper.Manifest do
       {:ok, profiles} when is_map(profiles) ->
         name = env || document["default_env"] || "dev"
 
-        unless is_binary(name) && Regex.match?(~r/^[A-Za-z0-9][A-Za-z0-9_-]*$/, name),
-          do:
-            Mix.raise(
-              "Environment names must be nonempty letters, digits, underscores or hyphens"
-            )
+        if !(is_binary(name) && Regex.match?(~r/^[A-Za-z0-9][A-Za-z0-9_-]*$/, name)),
+          do: Mix.raise("Environment names must be nonempty letters, digits, underscores or hyphens")
 
         overrides = Map.get(profiles, name)
 
-        unless is_map(overrides),
+        if !is_map(overrides),
           do:
             Mix.raise(
               "Unknown or invalid environment #{inspect(name)}; available: #{Enum.join(Map.keys(profiles), ", ")}"
@@ -143,13 +140,12 @@ defmodule FogOfWar.Wrapper.Manifest do
     start = get_in(manifest, ["startup", "path"])
     preload = get_in(manifest, ["preload", "paths"]) || []
 
-    unless is_list(preload), do: Mix.raise("preload.paths must be a list")
+    if !is_list(preload), do: Mix.raise("preload.paths must be a list")
 
     public = %{
       "paths" => Enum.uniq([start | preload]),
       "static_root" => get_in(manifest, ["assets", "static_root"]) || "priv/static",
-      "asset_directories" =>
-        get_in(manifest, ["assets", "directories"]) || ["assets", "css", "fonts", "images"],
+      "asset_directories" => get_in(manifest, ["assets", "directories"]) || ["assets", "css", "fonts", "images"],
       "bundle" => Path.join([".fow", manifest["environment"] || "default", "bundles", "source"])
     }
 
@@ -186,39 +182,36 @@ defmodule FogOfWar.Wrapper.Manifest do
       do: Mix.raise("app.name is required")
 
     if String.contains?(app["name"], ["/", "\\"]) || Regex.match?(~r/[\x00-\x1F]/, app["name"]),
-      do:
-        Mix.raise(
-          "app.name must be a display name, without path separators or control characters"
-        )
+      do: Mix.raise("app.name must be a display name, without path separators or control characters")
 
     origin = validate_origin!(web["origin"], "web.origin")
 
     if capture = manifest["capture"] do
-      unless is_map(capture), do: Mix.raise("capture must be a map")
+      if !is_map(capture), do: Mix.raise("capture must be a map")
       if capture["origin"], do: validate_origin!(capture["origin"], "capture.origin")
     end
 
     validate_path!(web["start_path"])
 
-    unless is_list(public["paths"]),
+    if !is_list(public["paths"]),
       do: Mix.raise("public.paths must explicitly list public route paths")
 
     Enum.each(public["paths"], &validate_path!/1)
     for key <- ["static_root", "bundle"], do: relative_path!(public[key])
 
-    unless is_list(public["asset_directories"]),
+    if !is_list(public["asset_directories"]),
       do: Mix.raise("public.asset_directories must be a list")
 
     Enum.each(public["asset_directories"], &relative_path!/1)
     platforms = get_in(manifest, ["mob", "platforms"]) || ["android", "ios"]
 
-    unless platforms != [] && Enum.all?(platforms, &(&1 in ["android", "ios"])),
+    if !(platforms != [] && Enum.all?(platforms, &(&1 in ["android", "ios"]))),
       do: Mix.raise("mob.platforms must list android and/or ios")
 
     for key <- ["width", "height"] do
       value = get_in(manifest, ["elixirkit", key]) || 760
 
-      unless is_integer(value) && value in 240..4096,
+      if !(is_integer(value) && value in 240..4096),
         do: Mix.raise("elixirkit.#{key} must be 240..4096")
     end
 
@@ -226,17 +219,16 @@ defmodule FogOfWar.Wrapper.Manifest do
     %{manifest | "web" => Map.put(web, "origin", origin)}
   end
 
-  def validate!(_),
-    do: Mix.raise("Resolved manifest requires schema 3 and app, web, public maps")
+  def validate!(_), do: Mix.raise("Resolved manifest requires schema 3 and app, web, public maps")
 
   @doc "Validate a website origin used for capture or startup and normalize it."
   def validate_origin!(value, label \\ "origin") do
-    unless is_binary(value), do: Mix.raise("#{label} must be an HTTP(S) origin")
+    if !is_binary(value), do: Mix.raise("#{label} must be an HTTP(S) origin")
     uri = URI.parse(value)
 
-    unless uri.scheme in ["http", "https"] && is_binary(uri.host) && uri.userinfo == nil &&
-             uri.query == nil && uri.fragment == nil && uri.path in [nil, "", "/"],
-           do: Mix.raise("#{label} must be an HTTP(S) origin, without credentials or a path")
+    if !(uri.scheme in ["http", "https"] && is_binary(uri.host) && uri.userinfo == nil &&
+           uri.query == nil && uri.fragment == nil && uri.path in [nil, "", "/"]),
+       do: Mix.raise("#{label} must be an HTTP(S) origin, without credentials or a path")
 
     if uri.scheme == "http" && uri.host not in ["localhost", "127.0.0.1", "[::1]", "::1"],
       do: Mix.raise("Use HTTPS for non-loopback origins")
@@ -246,20 +238,20 @@ defmodule FogOfWar.Wrapper.Manifest do
 
   @doc "Validate a route pathname suitable for public bundle capture."
   def validate_path!(path) do
-    unless is_binary(path) && String.starts_with?(path, "/") && !String.starts_with?(path, "//") &&
-             !String.contains?(path, ["?", "#", "\\", "\0"]) &&
-             !Enum.any?(String.split(URI.decode(path), "/"), &(&1 in ["..", "."])),
-           do: Mix.raise("Expected a concrete route path, got #{inspect(path)}")
+    if !(is_binary(path) && String.starts_with?(path, "/") && !String.starts_with?(path, "//") &&
+           !String.contains?(path, ["?", "#", "\\", "\0"]) &&
+           !Enum.any?(String.split(URI.decode(path), "/"), &(&1 in ["..", "."]))),
+       do: Mix.raise("Expected a concrete route path, got #{inspect(path)}")
 
     path
   end
 
   @doc "Validate a project-relative file path used by the manifest."
   def relative_path!(path) do
-    unless is_binary(path) && path != "" && Path.type(path) == :relative &&
-             !Enum.any?(Path.split(path), &(&1 in ["..", "."])) &&
-             !String.contains?(path, ["\\", "\0"]),
-           do: Mix.raise("Expected a project-relative path, got #{inspect(path)}")
+    if !(is_binary(path) && path != "" && Path.type(path) == :relative &&
+           !Enum.any?(Path.split(path), &(&1 in ["..", "."])) &&
+           !String.contains?(path, ["\\", "\0"])),
+       do: Mix.raise("Expected a project-relative path, got #{inspect(path)}")
 
     path
   end
@@ -268,11 +260,11 @@ defmodule FogOfWar.Wrapper.Manifest do
   def write!(path, manifest, force \\ false) do
     if File.exists?(path) && !force, do: Mix.raise("#{path} exists; edit it or pass --force")
     File.mkdir_p!(Path.dirname(path))
-    manifest = Map.drop(manifest, ["public"]) |> update_in(["web"], &Map.delete(&1, "start_path"))
+    manifest = manifest |> Map.delete("public") |> update_in(["web"], &Map.delete(&1, "start_path"))
     File.write!(path, [Jason.encode_to_iodata!(manifest, pretty: true), "\n"])
   end
 
   defp require_match!(value, regex, message) do
-    unless is_binary(value) && Regex.match?(regex, value), do: Mix.raise(message)
+    if !(is_binary(value) && Regex.match?(regex, value)), do: Mix.raise(message)
   end
 end

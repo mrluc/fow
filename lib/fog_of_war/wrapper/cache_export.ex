@@ -6,7 +6,9 @@ defmodule FogOfWar.Wrapper.CacheExport do
 
   Called directly by `FogOfWar.Wrapper.NativeBundle`. `mix fow.export.cache` exposes it as a separate capture step.
   """
-  alias FogOfWar.Wrapper.{Export, Manifest}
+  alias FogOfWar.Wrapper.Export
+  alias FogOfWar.Wrapper.Manifest
+
   @build "fog-of-war-2"
 
   @doc "Capture every selected route into a fresh output directory and return the index."
@@ -40,7 +42,7 @@ defmodule FogOfWar.Wrapper.CacheExport do
     paths = Enum.uniq(manifest["public"]["paths"])
     if paths == [], do: Mix.raise("Set public.paths explicitly before export")
 
-    unless manifest["web"]["start_path"] in paths,
+    if manifest["web"]["start_path"] not in paths,
       do: Mix.raise("web.start_path must be one of public.paths")
 
     paths
@@ -77,7 +79,7 @@ defmodule FogOfWar.Wrapper.CacheExport do
 
     html = Floki.raw_html([region])
     gzip = :zlib.gzip(html)
-    name = :crypto.hash(:sha256, path) |> Base.encode16(case: :lower)
+    name = :sha256 |> :crypto.hash(path) |> Base.encode16(case: :lower)
     file = "pages/#{name}.html.gz"
     write!(root, file, gzip)
     if path == manifest["web"]["start_path"], do: write!(root, "startup.html", body)
@@ -99,34 +101,36 @@ defmodule FogOfWar.Wrapper.CacheExport do
 
     saved_at = DateTime.utc_now()
 
-    %{
-      "schema" => 1,
-      "build" => @build,
-      "path" => path,
-      "regionId" => attrs["id"],
-      "title" => document |> Floki.find("title") |> Floki.text(),
-      "savedAt" => DateTime.to_iso8601(saved_at),
-      "file" => file,
-      "encoding" => "gzip",
-      "compressedBytes" => byte_size(gzip),
-      "htmlBytes" => byte_size(html),
-      "sha256" => :crypto.hash(:sha256, gzip) |> Base.encode16(case: :lower)
-    }
-    |> then(fn record ->
-      case attrs["data-fog-of-war-max-age-ms"] do
-        nil ->
-          record
+    then(
+      %{
+        "schema" => 1,
+        "build" => @build,
+        "path" => path,
+        "regionId" => attrs["id"],
+        "title" => document |> Floki.find("title") |> Floki.text(),
+        "savedAt" => DateTime.to_iso8601(saved_at),
+        "file" => file,
+        "encoding" => "gzip",
+        "compressedBytes" => byte_size(gzip),
+        "htmlBytes" => byte_size(html),
+        "sha256" => :sha256 |> :crypto.hash(gzip) |> Base.encode16(case: :lower)
+      },
+      fn record ->
+        case attrs["data-fog-of-war-max-age-ms"] do
+          nil ->
+            record
 
-        value ->
-          case Integer.parse(value) do
-            {ms, ""} when ms > 0 and ms <= 8_000_000_000_000_000 ->
-              Map.put(record, "expiresAt", DateTime.to_unix(saved_at, :millisecond) + ms)
+          value ->
+            case Integer.parse(value) do
+              {ms, ""} when ms > 0 and ms <= 8_000_000_000_000_000 ->
+                Map.put(record, "expiresAt", DateTime.to_unix(saved_at, :millisecond) + ms)
 
-            _ ->
-              Mix.raise("#{path}: invalid FogOfWar max age")
-          end
+              _ ->
+                Mix.raise("#{path}: invalid FogOfWar max age")
+            end
+        end
       end
-    end)
+    )
   end
 
   @doc "Write the bundle index from the captured route records and return it."

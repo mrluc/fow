@@ -1,6 +1,4 @@
 defmodule Mix.Tasks.Fow.Install.Desktop do
-  use Mix.Task
-
   @shortdoc "Install a built macOS app"
   @moduledoc """
   Install an existing app and register it with Spotlight.
@@ -11,5 +9,7 @@ defmodule Mix.Tasks.Fow.Install.Desktop do
   choose a different directory and `--force` to replace the installed copy.
   For preparation through installation in one step, use `mix fow.desktop`.
   """
+  use Mix.Task
+
   def run(args), do: Mix.Tasks.Fow.Install.OsxLocal.run(args)
 end

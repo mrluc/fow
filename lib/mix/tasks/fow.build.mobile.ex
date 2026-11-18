@@ -1,6 +1,4 @@
 defmodule Mix.Tasks.Fow.Build.Mobile do
-  use Mix.Task
-
   @shortdoc "Build a signed mobile release artifact"
   @moduledoc """
   Build a signed release from a generated mobile project, using Mob's signing
@@ -12,6 +10,10 @@ defmodule Mix.Tasks.Fow.Build.Mobile do
   `mix fow.mobile`, which uses Mob's development deploy workflow.
   """
 
+  use Mix.Task
+
+  alias FogOfWar.Wrapper.Workflow
+
   def run(args) do
     {opts, rest, invalid} =
       OptionParser.parse(args,
@@ -21,12 +23,11 @@ defmodule Mix.Tasks.Fow.Build.Mobile do
     platform = opts[:platform] || "android"
 
     if rest != [] || invalid != [] || platform not in ["android", "ios"],
-      do:
-        Mix.raise("Expected --platform android or ios and optional --output, --manifest or --env")
+      do: Mix.raise("Expected --platform android or ios and optional --output, --manifest or --env")
 
-    project = FogOfWar.Wrapper.Workflow.project_path(opts[:manifest] || ".fow.json", :mob, opts)
+    project = Workflow.project_path(opts[:manifest] || ".fow.json", :mob, opts)
 
-    unless File.regular?(Path.join(project, "mob.exs")),
+    if !File.regular?(Path.join(project, "mob.exs")),
       do: Mix.raise("Generate the mobile project first: #{project}")
 
     for arguments <- [["deps.get"], ["mob.install"], ["mob.release", "--" <> platform]] do

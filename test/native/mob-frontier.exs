@@ -88,7 +88,7 @@ if serials != [] do
     ])
 
   component = resolved |> String.split("\n", trim: true) |> Enum.find(&String.contains?(&1, "/"))
-  unless component, do: raise("Android could not resolve the app's launch activity")
+  if !component, do: raise("Android could not resolve the app's launch activity")
   MobDev.Connector.start_epmd()
   {_, 0} = System.cmd("adb", ["-s", serial, "reverse", "tcp:4369", "tcp:4369"])
   System.cmd("adb", ["-s", serial, "reverse", "--remove", "tcp:47190"])
@@ -104,9 +104,9 @@ if serials != [] do
   deadline = System.monotonic_time(:millisecond) + 20_000
 
   await_dist = fn recur ->
-    unless Enum.any?(MobDev.Tunnel.epmd_names(), fn {name, _} ->
-             String.starts_with?(name, prefix)
-           end) do
+    if !Enum.any?(MobDev.Tunnel.epmd_names(), fn {name, _} ->
+         String.starts_with?(name, prefix)
+       end) do
       if System.monotonic_time(:millisecond) >= deadline,
         do: raise("App did not register its development connection")
 
@@ -126,7 +126,7 @@ end
     name: String.to_atom("mob_webview_qa_#{System.pid()}@127.0.0.1")
   )
 
-unless length(devices) == 1 do
+if length(devices) != 1 do
   raise "Expected one connected Android app; set MOB_WEBVIEW_ANDROID_DEVICE to select its serial"
 end
 
@@ -232,10 +232,8 @@ try do
     evaluate.("!!window.fogOfWar && !!document.querySelector('#map-scene')")
   end)
 
-  unless evaluate.(
-           "document.documentElement.classList.contains('fow-offline') && !window.liveSocket.isConnected()"
-         ),
-         do: raise("Cold launch unexpectedly connected to the website")
+  if !evaluate.("document.documentElement.classList.contains('fow-offline') && !window.liveSocket.isConnected()"),
+    do: raise("Cold launch unexpectedly connected to the website")
 
   IO.inspect(
     evaluate.(
@@ -252,7 +250,7 @@ try do
   result = evaluate.("window.__bundleResult || window.__bundleError")
   IO.inspect(result, label: "IMPORT")
 
-  unless match?(%{"complete" => true, "total" => 4, "stored" => 4}, result),
+  if !match?(%{"complete" => true, "total" => 4, "stored" => 4}, result),
     do: raise("Fresh IndexedDB did not import all four bundled routes")
 
   evaluate.(~S"""
@@ -268,7 +266,7 @@ try do
   assets =
     wait.("decoded, canvas-readable packaged sprites", fn -> evaluate.("window.__assetQA") end)
 
-  unless assets["ok"] && assets["count"] == 5,
+  if !(assets["ok"] && assets["count"] == 5),
     do: raise("Packaged art failed: #{inspect(assets)}")
 
   wait.("pixel fog paint", fn ->
@@ -280,9 +278,7 @@ try do
   evaluate.("document.querySelector('a[href=\"/lat/0/lon/1\"]').click(); true")
   wait.("cached navigation", fn -> evaluate.("location.pathname === '/lat/0/lon/1'") end)
 
-  IO.puts(
-    "PASS: fresh offline Frontier, packaged artwork, compressed IndexedDB import and cached navigation"
-  )
+  IO.puts("PASS: fresh offline Frontier, packaged artwork, compressed IndexedDB import and cached navigation")
 
   {_, 0} = System.cmd("adb", ["-s", hd(serials), "reverse", "tcp:47190", "tcp:47190"])
 
@@ -290,7 +286,7 @@ try do
     evaluate.("!!document.querySelector('[data-phx-main]')?.classList.contains('phx-connected')")
   end)
 
-  unless evaluate.("location.pathname") == "/lat/0/lon/1", do: raise("Recovery changed the route")
+  if evaluate.("location.pathname") != "/lat/0/lon/1", do: raise("Recovery changed the route")
   evaluate.("document.querySelector('a[href=\"/lat/0/lon/2\"]').click(); true")
 
   wait.("live navigation", fn ->
@@ -299,9 +295,7 @@ try do
     )
   end)
 
-  IO.puts(
-    "PASS: automatic reconnect preserves selected route, followed by live server navigation"
-  )
+  IO.puts("PASS: automatic reconnect preserves selected route, followed by live server navigation")
 after
   if generated_screen? && is_pid(collector) do
     :ok = :rpc.call(node, Module.concat(["MobFrontierNativeQA"]), :stop, [collector, screen_pid])

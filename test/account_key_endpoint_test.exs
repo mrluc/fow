@@ -17,7 +17,8 @@ defmodule FogOfWar.AccountKeyEndpointTest do
     end)
 
     request =
-      Plug.Test.conn(:post, "/_fow/account-key", %{
+      :post
+      |> Plug.Test.conn("/_fow/account-key", %{
         "user_id" => "other",
         "device_id" => "1555dedd-8ddd-4e24-8f46-b428724f1fa3"
       })

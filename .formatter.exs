@@ -1,1 +1,1 @@
-[inputs: ["mix.exs", "{lib,test}/**/*.{ex,exs}"]]
+[plugins: [Styler], inputs: ["mix.exs", "{lib,test}/**/*.{ex,exs}"]]

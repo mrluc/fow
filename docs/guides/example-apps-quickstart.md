@@ -14,7 +14,7 @@
   ```
 - Elixir 1.20.4 and Erlang/OTP 29.0.6, as pinned in `.tool-versions`. Run `mix local.hex` from the checkout if Hex is missing.
 - For macOS builds, install Rust and the Xcode command-line tools. The generated build runs `cargo tauri`. If `cargo tauri --version` fails, install it once with `cargo install tauri-cli --version '^2' --locked`. Both Cargo commands can run from any directory.
-- For Android builds, install Android Studio, its Android SDK and Platform Tools, and start an emulator visible in `adb devices`. From the FoW checkout, run `mix archive.install hex mob_new` once to install the Mix generator. During the private preview, Android builds also require GitHub SSH access to `mrluc/fow_webview_mob`.
+- For Android builds, install Android Studio, its Android SDK and Platform Tools, and start an emulator visible in `adb devices`. From the FoW checkout, run `mix archive.install hex mob_new` once to install the Mix generator. The generated app fetches the public WebView dependency over HTTPS.
 
 
 ## Example: Counters app

@@ -1,6 +1,8 @@
 defmodule FogOfWar.WrapperTest do
   use ExUnit.Case, async: false
-  alias FogOfWar.Wrapper.{NativeBundle, Manifest}
+
+  alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.NativeBundle
 
   setup do
     root =

@@ -12,7 +12,7 @@ defmodule FogOfWarBasic.Counters do
 
   def increment(id) do
     Agent.get_and_update(__MODULE__, fn counters ->
-      count = Map.fetch!(counters, id) + 1
+      count = rem(Map.fetch!(counters, id) + 1, 150)
 
       for key <- [id, :all] do
         Phoenix.PubSub.broadcast(FogOfWarBasic.PubSub, topic(key), {:counter_changed, id, count})

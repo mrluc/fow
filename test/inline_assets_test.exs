@@ -1,5 +1,6 @@
 defmodule FogOfWar.Wrapper.InlineAssetsTest do
   use ExUnit.Case, async: true
+
   alias FogOfWar.Wrapper.InlineAssets
 
   test "inlines classic scripts and recursive styles while preserving defer order" do
@@ -35,8 +36,8 @@ defmodule FogOfWar.Wrapper.InlineAssetsTest do
     assert result =~ "data:font/ttf;base64,"
     refute result =~ "fog-of-war-assets://bundle/assets/font.ttf"
 
-    assert :binary.match(result, "window.a = 1") |> elem(0) >
-             :binary.match(result, "<p>ready") |> elem(0)
+    assert result |> :binary.match("window.a = 1") |> elem(0) >
+             result |> :binary.match("<p>ready") |> elem(0)
   end
 
   test "rejects external async scripts" do

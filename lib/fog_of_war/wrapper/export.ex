@@ -38,7 +38,7 @@ defmodule FogOfWar.Wrapper.Export do
             if String.downcase(to_string(k)) == "content-type", do: to_string(v)
           end)
 
-        unless String.starts_with?(type, "text/html"),
+        if !String.starts_with?(type, "text/html"),
           do: Mix.raise("Expected public HTML from #{url}, got #{type}")
 
         body
@@ -63,50 +63,46 @@ defmodule FogOfWar.Wrapper.Export do
     local = is_nil(uri.host) || String.starts_with?(url, origin <> "/")
     path = uri.path || ""
 
-    cond do
-      uri.scheme not in [nil, "http", "https"] || !local || path == "" ||
-        String.starts_with?(path, "/_fog/") || Map.has_key?(found, path) ->
-        copy_assets!(rest, project, manifest, stage, found)
+    if uri.scheme not in [nil, "http", "https"] || !local || path == "" ||
+         String.starts_with?(path, "/_fog/") || Map.has_key?(found, path) do
+      copy_assets!(rest, project, manifest, stage, found)
+    else
+      path = if String.starts_with?(path, "/"), do: path, else: "/" <> path
+      Manifest.validate_path!(path)
+      relative = URI.decode(String.trim_leading(path, "/"))
+      root = Path.expand(manifest["public"]["static_root"], project)
+      source = Path.join(root, relative)
 
-      true ->
-        path = if String.starts_with?(path, "/"), do: path, else: "/" <> path
-        Manifest.validate_path!(path)
-        relative = URI.decode(String.trim_leading(path, "/"))
-        root = Path.expand(manifest["public"]["static_root"], project)
-        source = Path.join(root, relative)
+      allowed =
+        Enum.any?(
+          manifest["public"]["asset_directories"],
+          &String.starts_with?(relative, &1 <> "/")
+        ) || relative == "favicon.ico"
 
-        allowed =
-          Enum.any?(
-            manifest["public"]["asset_directories"],
-            &String.starts_with?(relative, &1 <> "/")
-          ) || relative == "favicon.ico"
+      if !allowed || !File.regular?(source),
+        do: Mix.raise("Missing or disallowed public asset #{path}; adjust public.asset_directories")
 
-        if !allowed || !File.regular?(source),
-          do:
-            Mix.raise(
-              "Missing or disallowed public asset #{path}; adjust public.asset_directories"
-            )
+      reject_symlinks!(root, relative)
 
-        reject_symlinks!(root, relative)
+      if map_size(found) > 512 || File.stat!(source).size > 10_000_000,
+        do: Mix.raise("Public asset export limit exceeded")
 
-        if map_size(found) > 512 || File.stat!(source).size > 10_000_000,
-          do: Mix.raise("Public asset export limit exceeded")
+      target = "assets/" <> relative
+      data = File.read!(source)
+      write!(stage, target, data)
 
-        target = "assets/" <> relative
-        data = File.read!(source)
-        write!(stage, target, data)
+      urls =
+        if Path.extname(path) == ".css" do
+          ~r/(?:url\(\s*|@import\s+(?!url\s*\())["']?([^\s"'\)]+)["']?\s*\)?/
+          |> Regex.scan(data)
+          |> Enum.map(fn [_, ref] -> URI.merge("http://local" <> path, ref) end)
+          |> Enum.filter(&(&1.host == "local"))
+          |> Enum.map(& &1.path)
+        else
+          []
+        end
 
-        urls =
-          if Path.extname(path) == ".css" do
-            Regex.scan(~r/(?:url\(\s*|@import\s+(?!url\s*\())["']?([^\s"'\)]+)["']?\s*\)?/, data)
-            |> Enum.map(fn [_, ref] -> URI.merge("http://local" <> path, ref) end)
-            |> Enum.filter(&(&1.host == "local"))
-            |> Enum.map(& &1.path)
-          else
-            []
-          end
-
-        copy_assets!(rest ++ urls, project, manifest, stage, Map.put(found, path, target))
+      copy_assets!(rest ++ urls, project, manifest, stage, Map.put(found, path, target))
     end
   end
 

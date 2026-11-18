@@ -9,11 +9,15 @@ defmodule FogOfWar.MixProject do
       test_ignore_filters: [~r{/native/}],
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
+      aliases: [credo: "credo --strict"],
       deps: [
         {:phoenix_live_view, "~> 1.2.13"},
         {:jason, "~> 1.4"},
         {:floki, "~> 0.38.0"},
-        {:ex_doc, "~> 0.40", only: :dev, runtime: false}
+        {:ex_doc, "~> 0.40", only: :dev, runtime: false},
+        {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+        {:sobelow, "~> 0.19.0", only: [:dev, :test], runtime: false},
+        {:styler, "~> 1.12.0", only: [:dev, :test], runtime: false}
       ],
       docs: [
         main: "readme",

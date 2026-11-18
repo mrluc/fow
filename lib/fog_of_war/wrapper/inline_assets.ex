@@ -40,21 +40,20 @@ defmodule FogOfWar.Wrapper.InlineAssets do
                 fail("cross-origin external script is unsupported: #{src}")
 
               true ->
-                content = read_asset!(url.path, src, assets, stage) |> safe_script()
+                content = url.path |> read_asset!(src, assets, stage) |> safe_script()
 
                 script =
-                  {"script", Enum.reject(attrs, fn {k, _} -> k in ["src", "defer"] end),
-                   [content]}
+                  {"script", Enum.reject(attrs, fn {k, _} -> k in ["src", "defer"] end), [content]}
 
-                if attrs_map["defer"] != nil do
+                if attrs_map["defer"] == nil do
+                  script
+                else
                   Process.put(
                     {__MODULE__, :deferred},
                     Process.get({__MODULE__, :deferred}, []) ++ [script]
                   )
 
                   {:comment, " deferred startup script inlined at body end "}
-                else
-                  script
                 end
             end
           else
@@ -69,7 +68,7 @@ defmodule FogOfWar.Wrapper.InlineAssets do
             url = resolve(href, origin <> "/")
 
             if same_origin?(url, origin) do
-              css = expand_css!(url.path, assets, stage, origin, MapSet.new()) |> safe_style()
+              css = url.path |> expand_css!(assets, stage, origin, MapSet.new()) |> safe_style()
               {"style", Enum.filter(attrs, fn {key, _} -> key == "media" end), [css]}
             else
               fail("cross-origin stylesheet is unsupported: #{href}")
@@ -154,13 +153,10 @@ defmodule FogOfWar.Wrapper.InlineAssets do
 
   defp resolve(ref, base), do: URI.merge(base, ref)
 
-  defp same_origin?(uri, origin),
-    do: URI.to_string(%{uri | path: nil, query: nil, fragment: nil}) == origin
+  defp same_origin?(uri, origin), do: URI.to_string(%{uri | path: nil, query: nil, fragment: nil}) == origin
 
   defp suffix(uri),
-    do:
-      if(uri.query, do: "?" <> uri.query, else: "") <>
-        if(uri.fragment, do: "#" <> uri.fragment, else: "")
+    do: if(uri.query, do: "?" <> uri.query, else: "") <> if(uri.fragment, do: "#" <> uri.fragment, else: "")
 
   defp safe_script(text), do: Regex.replace(~r{</script}i, text, "<\\/script")
   defp safe_style(text), do: Regex.replace(~r{</style}i, text, "<\\/style")

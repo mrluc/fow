@@ -1,5 +1,4 @@
 defmodule Mix.Tasks.Fow.Gen.Desktop do
-  use Mix.Task
   @shortdoc "Generate a macOS project from a prepared Apple bundle"
   @moduledoc """
   Generate desktop source when you want to build separately or customize the host.
@@ -12,6 +11,11 @@ defmodule Mix.Tasks.Fow.Gen.Desktop do
 
   This is the generation step in the macOS workflow. `mix fow.desktop` calls the same `FogOfWar.Wrapper.Generator.run!/4` function directly, rather than invoking this task. Use this task when you want the source project as a separate step.
   """
+
+  use Mix.Task
+
+  alias FogOfWar.Wrapper.Generator
+  alias FogOfWar.Wrapper.Manifest
 
   def run(args) do
     {opts, rest, invalid} =
@@ -27,21 +31,19 @@ defmodule Mix.Tasks.Fow.Gen.Desktop do
 
     if rest != [] || invalid != [], do: Mix.raise("Invalid generator arguments")
     manifest = Path.expand(opts[:manifest] || ".fow.json")
-    resolved = FogOfWar.Wrapper.Manifest.read!(manifest, opts[:env])
+    resolved = Manifest.read!(manifest, opts[:env])
 
     default_output =
       Path.join([".fow", resolved["environment"] || "default", "projects", "desktop"])
 
     output = Path.expand(opts[:output] || default_output)
 
-    FogOfWar.Wrapper.Generator.run!(:elixirkit, manifest, output,
+    Generator.run!(:elixirkit, manifest, output,
       env: opts[:env],
       bundle_dir: opts[:bundle_dir],
       force: opts[:force]
     )
 
-    Mix.shell().info(
-      "Created #{output}. See README.md and build.sh; no Phoenix server source copied."
-    )
+    Mix.shell().info("Created #{output}. See README.md and build.sh; no Phoenix server source copied.")
   end
 end

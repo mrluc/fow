@@ -1,5 +1,4 @@
 defmodule Mix.Tasks.Fow.Desktop do
-  use Mix.Task
   @shortdoc "Prepare, build and install the macOS WebKit app"
   @moduledoc """
   Build and install the macOS wrapper in one step.
@@ -12,6 +11,10 @@ defmodule Mix.Tasks.Fow.Desktop do
 
   This is the complete macOS workflow. Internally it calls `FogOfWar.Wrapper.Workflow.desktop!/2`, which invokes bundle preparation, generation, build and installation functions directly. It does not invoke the other Mix tasks.
   """
+  use Mix.Task
+
+  alias FogOfWar.Wrapper.Workflow
+
   def run(args) do
     Mix.Task.run("app.config")
 
@@ -28,7 +31,7 @@ defmodule Mix.Tasks.Fow.Desktop do
       )
 
     if rest != [] || invalid != [], do: Mix.raise("Invalid desktop arguments")
-    destination = FogOfWar.Wrapper.Workflow.desktop!(opts[:manifest] || ".fow.json", opts)
+    destination = Workflow.desktop!(opts[:manifest] || ".fow.json", opts)
     Mix.shell().info("Installed #{destination}; launch it from Spotlight")
   end
 end

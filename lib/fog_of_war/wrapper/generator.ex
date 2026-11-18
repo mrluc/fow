@@ -6,8 +6,11 @@ defmodule FogOfWar.Wrapper.Generator do
 
   Called by both generator Mix tasks and directly by `FogOfWar.Wrapper.Workflow.desktop!/2`. It creates source projects; `Workflow` handles desktop building and installation.
   """
-  alias FogOfWar.Wrapper.{Export, Manifest, Output}
-  @mob_webview_git "git@github.com:mrluc/fow_webview_mob.git"
+  alias FogOfWar.Wrapper.Export
+  alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.Output
+
+  @mob_webview_git "https://github.com/mrluc/fow_webview_mob.git"
   @mob_webview_ref "1be07da3604a64bc6ef11c87858c3c9ad372e80b"
 
   @doc "Generate a Mob or ElixirKit project at the output path. Read the selected environment from the manifest file. Pass `:force` to replace an existing generated project after staging succeeds."
@@ -16,27 +19,25 @@ defmodule FogOfWar.Wrapper.Generator do
     root = Path.dirname(Path.expand(manifest_path))
 
     {bundle_path, native_bundles, webview_path} =
-      cond do
-        target == :mob ->
-          native_root =
-            Path.expand(
-              opts[:bundle_dir] || ".fow/#{manifest["environment"] || "default"}/bundles",
-              root
-            )
+      if target == :mob do
+        native_root =
+          Path.expand(
+            opts[:bundle_dir] || ".fow/#{manifest["environment"] || "default"}/bundles",
+            root
+          )
 
-          native_bundles = read_native_bundles!(native_root, manifest)
-          {dependency, path} = webview_dependency!(manifest, root, opts)
-          {native_root, native_bundles, {dependency, path}}
+        native_bundles = read_native_bundles!(native_root, manifest)
+        {dependency, path} = webview_dependency!(manifest, root, opts)
+        {native_root, native_bundles, {dependency, path}}
+      else
+        source =
+          Path.expand(
+            opts[:bundle_dir] || ".fow/#{manifest["environment"] || "default"}/bundles/apple",
+            root
+          )
 
-        true ->
-          source =
-            Path.expand(
-              opts[:bundle_dir] || ".fow/#{manifest["environment"] || "default"}/bundles/apple",
-              root
-            )
-
-          native = read_native_bundle!(source, "apple", manifest)
-          {source, [{"apple", source, native}], nil}
+        native = read_native_bundle!(source, "apple", manifest)
+        {source, [{"apple", source, native}], nil}
       end
 
     {webview_dependency, webview_protected} = webview_path || {nil, nil}
@@ -123,25 +124,23 @@ defmodule FogOfWar.Wrapper.Generator do
       is_binary(path) ->
         path = Path.expand(path, root)
 
-        unless File.regular?(Path.join(path, "priv/mob_plugin.exs")) &&
-                 File.regular?(Path.join(path, "mix.exs")),
-               do: Mix.raise("--webview-path must point to the MobWebView package")
+        if !(File.regular?(Path.join(path, "priv/mob_plugin.exs")) &&
+               File.regular?(Path.join(path, "mix.exs"))),
+           do: Mix.raise("--webview-path must point to the MobWebView package")
 
         {"{:mob_webview, path: #{inspect(path)}}", path}
 
       is_binary(git) ->
-        unless is_binary(ref) && Regex.match?(~r/^[a-fA-F0-9]{40}$/, ref),
+        if !(is_binary(ref) && Regex.match?(~r/^[a-fA-F0-9]{40}$/, ref)),
           do: Mix.raise("--webview-git requires --webview-ref with a full pinned commit SHA")
 
-        unless String.starts_with?(git, ["git@", "ssh://", "https://"]),
+        if !String.starts_with?(git, ["git@", "ssh://", "https://"]),
           do: Mix.raise("WebView Git source must be an SSH or HTTPS repository URL")
 
         {"{:mob_webview, git: #{inspect(git)}, ref: #{inspect(ref)}}", nil}
 
       true ->
-        Mix.raise(
-          "MobWebView is not published yet; pass --webview-path or --webview-git with --webview-ref"
-        )
+        Mix.raise("MobWebView is not published yet; pass --webview-path or --webview-git with --webview-ref")
     end
   end
 
@@ -149,7 +148,7 @@ defmodule FogOfWar.Wrapper.Generator do
     for platform <- get_in(manifest, ["mob", "platforms"]) || ["android", "ios"] do
       source = Path.join(native_root, platform)
 
-      unless File.regular?(Path.join(source, "native.json")),
+      if !File.regular?(Path.join(source, "native.json")),
         do:
           Mix.raise(
             "Prepare the #{platform} bundle first: mix fow.bundle.prepare --platform #{platform} (or pass --bundle-dir)"
@@ -163,16 +162,13 @@ defmodule FogOfWar.Wrapper.Generator do
     native = source |> Path.join("native.json") |> File.read!() |> Jason.decode!()
     index = source |> Path.join("index.json") |> File.read!() |> Jason.decode!()
 
-    unless native["schema"] == 1 && native["platform"] == platform &&
-             native["url"] == manifest["web"]["origin"] <> manifest["web"]["start_path"] &&
-             index["scope"] == "public" && index["origin"] == manifest["web"]["origin"] &&
-             index["environment"] == manifest["environment"] &&
-             Enum.sort(Map.keys(index["pages"])) ==
-               Enum.sort(Enum.uniq(manifest["public"]["paths"])),
-           do:
-             Mix.raise(
-               "Native #{platform} bundle must match the selected environment, origin and public paths"
-             )
+    if !(native["schema"] == 1 && native["platform"] == platform &&
+           native["url"] == manifest["web"]["origin"] <> manifest["web"]["start_path"] &&
+           index["scope"] == "public" && index["origin"] == manifest["web"]["origin"] &&
+           index["environment"] == manifest["environment"] &&
+           Enum.sort(Map.keys(index["pages"])) ==
+             Enum.sort(Enum.uniq(manifest["public"]["paths"]))),
+       do: Mix.raise("Native #{platform} bundle must match the selected environment, origin and public paths")
 
     native
   end
@@ -213,8 +209,7 @@ defmodule FogOfWar.Wrapper.Generator do
       )
 
     if status != 0,
-      do:
-        Mix.raise("Install the upstream generator first: mix archive.install hex mob_new\n#{log}")
+      do: Mix.raise("Install the upstream generator first: mix archive.install hex mob_new\n#{log}")
 
     for entry <- File.ls!(Path.join(parent, app)),
         do: File.rename!(Path.join([parent, app, entry]), Path.join(stage, entry))
@@ -293,7 +288,7 @@ defmodule FogOfWar.Wrapper.Generator do
       source = File.read!(zig)
       copy = ~s|const cp = b.addSystemCommand(&.{"cp"});|
 
-      unless length(:binary.matches(source, copy)) == 2,
+      if length(:binary.matches(source, copy)) != 2,
         do: Mix.raise("Unexpected Mob Android library-copy steps; review the pinned scaffold")
 
       File.write!(
@@ -301,7 +296,7 @@ defmodule FogOfWar.Wrapper.Generator do
         String.replace(
           source,
           copy,
-          copy <> "\n    if (@import(\"builtin\").os.tag == .macos) cp.addArg(\"-S\");"
+          copy <> ~s{\n    if (@import("builtin").os.tag == .macos) cp.addArg("-S");}
         )
       )
     end
@@ -457,8 +452,7 @@ defmodule FogOfWar.Wrapper.Generator do
   end
 
   defp template(name, assigns),
-    do:
-      EEx.eval_file(Application.app_dir(:fow, "priv/templates/wrapper/#{name}"), assigns: assigns)
+    do: EEx.eval_file(Application.app_dir(:fow, "priv/templates/wrapper/#{name}"), assigns: assigns)
 
   defp shell_quote(value), do: "'" <> String.replace(value, "'", "'\\''") <> "'"
 

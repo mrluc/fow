@@ -1,5 +1,6 @@
 defmodule FogOfWarTest do
   use ExUnit.Case, async: true
+
   import Phoenix.LiveViewTest
 
   test "all spellings render the same explicit opt-in and escape content" do

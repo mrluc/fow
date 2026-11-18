@@ -1,5 +1,4 @@
 defmodule Mix.Tasks.Fow.Export.Cache do
-  use Mix.Task
   @shortdoc "Export public FoW regions as binary gzip files and a route index (no browser)"
   @moduledoc """
   Export offline route snapshots without building an app.
@@ -12,6 +11,11 @@ defmodule Mix.Tasks.Fow.Export.Cache do
 
   This is a lower-level capture tool for inspecting or consuming gzip route records. Native bundle preparation calls the same `FogOfWar.Wrapper.CacheExport` module directly; running this task separately is unnecessary for a normal build.
   """
+  use Mix.Task
+
+  alias FogOfWar.Wrapper.CacheExport
+  alias FogOfWar.Wrapper.Manifest
+
   def run(args) do
     Mix.Task.run("app.config")
 
@@ -28,13 +32,13 @@ defmodule Mix.Tasks.Fow.Export.Cache do
 
     if rest != [] || invalid != [], do: Mix.raise("Invalid cache export arguments")
     path = Path.expand(opts[:manifest] || ".fow.json")
-    manifest = FogOfWar.Wrapper.Manifest.read!(path, opts[:env])
+    manifest = Manifest.read!(path, opts[:env])
 
     output =
       Path.expand(opts[:output] || manifest["public"]["bundle"] <> "-cache", Path.dirname(path))
 
     index =
-      FogOfWar.Wrapper.CacheExport.run!(manifest, output,
+      CacheExport.run!(manifest, output,
         base_url: opts[:base_url],
         debug: opts[:debug]
       )

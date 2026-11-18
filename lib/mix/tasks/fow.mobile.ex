@@ -1,8 +1,4 @@
 defmodule Mix.Tasks.Fow.Mobile do
-  use Mix.Task
-
-  alias FogOfWar.Wrapper.{Generator, Manifest, NativeBundle, Output, Workflow}
-
   @shortdoc "Prepare, generate, build and deploy a mobile app"
   @moduledoc """
   Build and deploy a development wrapper to a running device or emulator.
@@ -14,6 +10,14 @@ defmodule Mix.Tasks.Fow.Mobile do
   For local Android origins, set up adb reverse before deploying.
   Use `--force` to replace prepared bundles and generated source.
   """
+
+  use Mix.Task
+
+  alias FogOfWar.Wrapper.Generator
+  alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.NativeBundle
+  alias FogOfWar.Wrapper.Output
+  alias FogOfWar.Wrapper.Workflow
 
   def run(args) do
     Mix.Task.run("app.config")
@@ -35,7 +39,7 @@ defmodule Mix.Tasks.Fow.Mobile do
     if rest != [] || invalid != [], do: Mix.raise("Invalid mobile arguments")
 
     platform = opts[:platform] || "android"
-    unless platform in ["android", "ios"], do: Mix.raise("--platform must be android or ios")
+    if platform not in ["android", "ios"], do: Mix.raise("--platform must be android or ios")
     path = Path.expand(opts[:manifest] || ".fow.json")
     manifest = Manifest.read!(path, opts[:env])
     root = Path.dirname(path)
@@ -43,7 +47,7 @@ defmodule Mix.Tasks.Fow.Mobile do
     project = Workflow.project_path(path, :mob, opts)
     platforms = get_in(manifest, ["mob", "platforms"]) || ["android", "ios"]
 
-    unless platform in platforms,
+    if platform not in platforms,
       do: Mix.raise("Selected manifest environment excludes #{platform}")
 
     Output.validate!(project, [root, bundles])

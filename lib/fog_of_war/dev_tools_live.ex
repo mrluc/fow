@@ -8,10 +8,15 @@ defmodule FogOfWar.DevToolsLive do
 
   def mount(_params, session, socket) do
     scale = Map.get(session, "scale", 1.0)
-    unless is_number(scale) and scale > 0, do: raise(ArgumentError, "DevTools scale must be a positive number")
+    if !(is_number(scale) and scale > 0), do: raise(ArgumentError, "DevTools scale must be a positive number")
+
     {:ok,
-     assign(socket, dock: Map.get(session, "dock", "bottom"), css: @css, semi_transparent: Map.get(session, "semi_transparent", false), scale: scale),
-     layout: false}
+     assign(socket,
+       dock: Map.get(session, "dock", "bottom"),
+       css: @css,
+       semi_transparent: Map.get(session, "semi_transparent", false),
+       scale: scale
+     ), layout: false}
   end
 
   def render(assigns) do
