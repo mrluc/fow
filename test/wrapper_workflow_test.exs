@@ -75,6 +75,22 @@ defmodule FogOfWar.WrapperWorkflowTest do
     assert Path.wildcard(output <> ".old-*") == []
   end
 
+  test "staged writes reject paths outside the staging directory", %{root: root} do
+    stage = Path.join(root, "stage")
+    outside = Path.join(root, "outside.txt")
+
+    for path <- ["../outside.txt", outside] do
+      assert_raise Mix.Error, ~r/project-relative path/, fn ->
+        Output.write_staged!(stage, path, "content")
+      end
+    end
+
+    refute File.exists?(outside)
+    refute File.exists?(stage)
+    assert :ok = Output.write_staged!(stage, "nested/inside.txt", "content")
+    assert File.read!(Path.join(stage, "nested/inside.txt")) == "content"
+  end
+
   test "replacement rejects source, ancestors, home and symlink destinations", %{root: root} do
     for output <- ["/", System.user_home!(), root, Path.dirname(root)] do
       assert_raise Mix.Error, ~r/protected/, fn ->

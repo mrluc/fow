@@ -1,6 +1,7 @@
 defmodule FogOfWar.Wrapper.Export do
   @moduledoc "Fetches public HTML and gathers local assets for native bundles."
   alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.Output
 
   @doc "Fetch an anonymous HTML response for public capture."
   def fetch_html!(url) do
@@ -97,7 +98,7 @@ defmodule FogOfWar.Wrapper.Export do
 
     target = "assets/" <> relative
     data = File.read!(source)
-    write!(stage, target, data)
+    Output.write_staged!(stage, target, data)
 
     {path, target, asset_references(Path.extname(path), path, data)}
   end
@@ -125,11 +126,5 @@ defmodule FogOfWar.Wrapper.Export do
 
       path
     end)
-  end
-
-  defp write!(stage, relative, bytes) do
-    path = Path.join(stage, relative)
-    File.mkdir_p!(Path.dirname(path))
-    File.write!(path, bytes)
   end
 end

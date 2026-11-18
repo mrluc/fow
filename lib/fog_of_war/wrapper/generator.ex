@@ -79,7 +79,7 @@ defmodule FogOfWar.Wrapper.Generator do
     end
 
     Manifest.write!(Path.join(stage, ".fow.json"), manifest)
-    put!(stage, "mix.exs", mixfile(target, assigns))
+    Output.write_staged!(stage, "mix.exs", mixfile(target, assigns))
 
     if target == :mob,
       do: mobile!(stage, assigns, manifest),
@@ -87,16 +87,16 @@ defmodule FogOfWar.Wrapper.Generator do
 
     if icon = manifest["app"]["icon"] do
       source = Export.checked_source!(root, icon)
-      put!(stage, "branding/source" <> Path.extname(icon), File.read!(source))
+      Output.write_staged!(stage, "branding/source" <> Path.extname(icon), File.read!(source))
     end
 
-    put!(
+    Output.write_staged!(
       stage,
       ".gitignore",
       "/deps/\n/_build/\n/src-tauri/target/\n/android/.gradle/\n/android/app/build/\n/mob.local.exs\n"
     )
 
-    put!(stage, "README.md", readme(target, assigns))
+    Output.write_staged!(stage, "README.md", readme(target, assigns))
   end
 
   defp webview_dependency!(:elixirkit, _manifest, _root, _opts), do: {nil, nil}
@@ -179,7 +179,7 @@ defmodule FogOfWar.Wrapper.Generator do
 
     for file <- Enum.uniq(files) do
       input = Export.checked_source!(source, file)
-      put!(target, file, File.read!(input))
+      Output.write_staged!(target, file, File.read!(input))
     end
   end
 
@@ -240,10 +240,10 @@ defmodule FogOfWar.Wrapper.Generator do
   defp mobile!(stage, a, manifest) do
     File.rm(Path.join(stage, "lib/#{a[:app]}/repo.ex"))
     File.rm_rf!(Path.join(stage, "test/#{a[:app]}"))
-    put!(stage, "test/#{a[:app]}/home_screen_test.exs", template("mobile_test.exs.eex", a))
-    put!(stage, "config/config.exs", "import Config\nconfig :mob, :plugins, [:mob_webview]\n")
-    put!(stage, "lib/#{a[:app]}/app.ex", template("mobile_app.ex.eex", a))
-    put!(stage, "lib/#{a[:app]}/home_screen.ex", template("mobile_screen.ex.eex", a))
+    Output.write_staged!(stage, "test/#{a[:app]}/home_screen_test.exs", template("mobile_test.exs.eex", a))
+    Output.write_staged!(stage, "config/config.exs", "import Config\nconfig :mob, :plugins, [:mob_webview]\n")
+    Output.write_staged!(stage, "lib/#{a[:app]}/app.ex", template("mobile_app.ex.eex", a))
+    Output.write_staged!(stage, "lib/#{a[:app]}/home_screen.ex", template("mobile_screen.ex.eex", a))
     # The plugin owns native registration and asset serving; do not patch Mob's built-in WebView.
     File.rm(Path.join(stage, "prepare-native.exs"))
     gradle = Path.join(stage, "android/app/build.gradle")
@@ -344,7 +344,7 @@ defmodule FogOfWar.Wrapper.Generator do
       [:append]
     )
 
-    put!(stage, "build.sh", """
+    Output.write_staged!(stage, "build.sh", """
     #!/usr/bin/env bash
     set -euo pipefail
     cd "$(dirname "$0")"
@@ -358,11 +358,11 @@ defmodule FogOfWar.Wrapper.Generator do
 
   defp desktop!(stage, a, manifest) do
     icon = File.read!(Application.app_dir(:fow, "priv/templates/wrapper/fallback.png"))
-    put!(stage, "branding/fallback.png", icon)
-    put!(stage, "src-tauri/icons/icon.png", icon)
+    Output.write_staged!(stage, "branding/fallback.png", icon)
+    Output.write_staged!(stage, "src-tauri/icons/icon.png", icon)
 
-    put!(stage, "src-tauri/src/main.rs", template("desktop_apple_main.rs.eex", a))
-    put!(stage, "src-tauri/src/desktop_bundle.rs", template("desktop_bundle.rs.eex", a))
+    Output.write_staged!(stage, "src-tauri/src/main.rs", template("desktop_apple_main.rs.eex", a))
+    Output.write_staged!(stage, "src-tauri/src/desktop_bundle.rs", template("desktop_bundle.rs.eex", a))
 
     build_script =
       """
@@ -373,9 +373,9 @@ defmodule FogOfWar.Wrapper.Generator do
       }
       """
 
-    put!(stage, "src-tauri/build.rs", build_script)
+    Output.write_staged!(stage, "src-tauri/build.rs", build_script)
 
-    put!(stage, "src-tauri/Cargo.toml", """
+    Output.write_staged!(stage, "src-tauri/Cargo.toml", """
     [package]
     name = "#{a[:app]}"
     version = "#{manifest["app"]["version"]}"
@@ -415,9 +415,9 @@ defmodule FogOfWar.Wrapper.Generator do
       }
     }
 
-    put!(stage, "src-tauri/tauri.conf.json", Jason.encode!(config, pretty: true))
+    Output.write_staged!(stage, "src-tauri/tauri.conf.json", Jason.encode!(config, pretty: true))
 
-    put!(stage, "src-tauri/App.entitlements", """
+    Output.write_staged!(stage, "src-tauri/App.entitlements", """
     <?xml version="1.0" encoding="UTF-8"?>
     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
     <plist version="1.0"><dict><key>com.apple.security.cs.allow-jit</key><true/>
@@ -426,7 +426,7 @@ defmodule FogOfWar.Wrapper.Generator do
     <key>com.apple.security.cs.allow-dyld-environment-variables</key><true/></dict></plist>
     """)
 
-    put!(stage, "build.sh", """
+    Output.write_staged!(stage, "build.sh", """
     #!/usr/bin/env bash
     set -euo pipefail
     cd "$(dirname "$0")"
@@ -459,12 +459,6 @@ defmodule FogOfWar.Wrapper.Generator do
       |> String.replace("<", "&lt;")
       |> String.replace(">", "&gt;")
       |> String.replace("\"", "&quot;")
-
-  defp put!(root, path, content) do
-    file = Path.join(root, path)
-    File.mkdir_p!(Path.dirname(file))
-    File.write!(file, content)
-  end
 
   defp readme(:mob, a) do
     """

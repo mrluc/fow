@@ -8,6 +8,15 @@ defmodule FogOfWar.Wrapper.Output do
   Used by `Generator` and `Workflow` to stage replacements safely. It is an implementation detail of generation and installation.
   """
 
+  alias FogOfWar.Wrapper.Manifest
+
+  @doc "Write a relative file under a staging directory controlled by the wrapper."
+  def write_staged!(stage, relative, content) do
+    target = Path.join(stage, Manifest.relative_path!(relative))
+    File.mkdir_p!(Path.dirname(target))
+    File.write!(target, content)
+  end
+
   # Build beside the destination, then swap. A failed build never deletes the
   # previous project/app. Rename first, so cleanup never traverses its old path.
   @doc "Build in a temporary sibling directory and replace the destination after success."

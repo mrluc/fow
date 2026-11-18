@@ -8,6 +8,7 @@ defmodule FogOfWar.Wrapper.CacheExport do
   """
   alias FogOfWar.Wrapper.Export
   alias FogOfWar.Wrapper.Manifest
+  alias FogOfWar.Wrapper.Output
 
   @build "fog-of-war-2"
 
@@ -65,8 +66,8 @@ defmodule FogOfWar.Wrapper.CacheExport do
     gzip = :zlib.gzip(html)
     name = :sha256 |> :crypto.hash(path) |> Base.encode16(case: :lower)
     file = "pages/#{name}.html.gz"
-    write!(root, file, gzip)
-    if path == manifest["web"]["start_path"], do: write!(root, "startup.html", body)
+    Output.write_staged!(root, file, gzip)
+    if path == manifest["web"]["start_path"], do: Output.write_staged!(root, "startup.html", body)
 
     if opts[:debug], do: write_debug!(root, name, capture_origin!(manifest, opts) <> path, body, html)
 
@@ -113,9 +114,9 @@ defmodule FogOfWar.Wrapper.CacheExport do
 
   defp write_debug!(root, name, url, body, html) do
     debug = "debug/#{name}"
-    write!(root, debug <> "/request.json", Jason.encode!(%{method: "GET", url: url}, pretty: true))
-    write!(root, debug <> "/response.html", body)
-    write!(root, debug <> "/region.html", html)
+    Output.write_staged!(root, debug <> "/request.json", Jason.encode!(%{method: "GET", url: url}, pretty: true))
+    Output.write_staged!(root, debug <> "/response.html", body)
+    Output.write_staged!(root, debug <> "/region.html", html)
   end
 
   defp put_expiry!(record, nil, _saved_at, _path), do: record
@@ -144,13 +145,7 @@ defmodule FogOfWar.Wrapper.CacheExport do
       "pages" => pages
     }
 
-    write!(root, "index.json", Jason.encode!(index, pretty: true))
+    Output.write_staged!(root, "index.json", Jason.encode!(index, pretty: true))
     index
-  end
-
-  defp write!(root, file, body) do
-    target = Path.join(root, file)
-    File.mkdir_p!(Path.dirname(target))
-    File.write!(target, body)
   end
 end
