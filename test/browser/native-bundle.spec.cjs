@@ -11,7 +11,6 @@ test('native public bundle starts offline, imports gzip routes and automatically
   const manifest = JSON.parse(fs.readFileSync(path.join(project, '.fow.json')));
   // Keep this fixture's static files rooted in the real example, but isolate every output.
   manifest.web.origin = origin;
-  manifest.public.static_root = 'priv/static';
   const manifestFile = path.join(project, `.fow-test-${process.pid}.json`);
   fs.writeFileSync(manifestFile, JSON.stringify(manifest));
   const output = path.join(root, 'bundle');
@@ -42,8 +41,8 @@ test('native public bundle starts offline, imports gzip routes and automatically
     expect(await page.evaluate(() => window.fogOfWarStartup)).toMatchObject({complete:true,stored:4});
     await expect(page.locator('html')).toHaveClass(/fow-offline/);
     expect(await page.evaluate(async () => (await document.fonts.load('20px "Pirata One"')).length)).toBe(1);
-    await expect(page.locator('#frontier-connection [data-label="connect"]')).toHaveText('Connect');
-    const art = await page.evaluate(async () => Promise.all(['/images/fog-of-war-logo.png','/images/terrain.png','/images/pine.png','/images/scout-idle.png','/images/scout-walk.png'].map(src => new Promise((resolve,reject) => {
+    await expect(page.locator('[data-connection-action]')).toHaveText('Go online');
+    const art = await page.evaluate(async () => Promise.all(['/images/fog-of-war-logo.png','/images/terrain.png','/images/tree/256/pine.png','/images/scout-idle.png','/images/scout-walk.png'].map(src => new Promise((resolve,reject) => {
       const image = new Image(); image.crossOrigin = 'anonymous';
       image.onload = () => { try {
         const canvas = document.createElement('canvas'); canvas.width = canvas.height = 4;

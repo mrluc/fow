@@ -170,7 +170,7 @@ defmodule FogOfWar.BrowserFixtures do
             bridge = """
             <script>window.addEventListener('fog-of-war:snapshot',()=>{
               const region=document.querySelector('[phx-hook="FogOfWar"]');
-              parent.postMessage({kind:'fog-of-war-test-root-mounted',attempt:window.name,path:region?.dataset.fogOfWarPath},location.origin);
+              parent.postMessage({kind:'fog-of-war-test-root-mounted',attempt:window.name,path:region?.dataset.fogOfWarPath || location.pathname},location.origin);
             });</script>
             """
 
