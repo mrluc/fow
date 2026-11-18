@@ -75,9 +75,8 @@ defmodule FogOfWar.Wrapper.Export do
   defp copy_asset!(path, project, manifest, stage, found) do
     path = if String.starts_with?(path, "/"), do: path, else: "/" <> path
     Manifest.validate_path!(path)
-    relative = URI.decode(String.trim_leading(path, "/"))
-    root = Path.expand(manifest["public"]["static_root"], project)
-    source = Path.join(root, relative)
+    relative = path |> String.trim_leading("/") |> URI.decode() |> Manifest.relative_path!()
+    static_root = Manifest.relative_path!(manifest["public"]["static_root"])
 
     allowed =
       Enum.any?(
@@ -85,10 +84,13 @@ defmodule FogOfWar.Wrapper.Export do
         &String.starts_with?(relative, &1 <> "/")
       ) || relative == "favicon.ico"
 
-    if !allowed || !File.regular?(source),
+    if !allowed,
       do: Mix.raise("Missing or disallowed public asset #{path}; adjust public.asset_directories")
 
-    reject_symlinks!(root, relative)
+    source = checked_source!(project, Path.join(static_root, relative))
+
+    if !File.regular?(source),
+      do: Mix.raise("Missing or disallowed public asset #{path}; adjust public.asset_directories")
 
     if map_size(found) > 512 || File.stat!(source).size > 10_000_000,
       do: Mix.raise("Public asset export limit exceeded")
@@ -110,9 +112,10 @@ defmodule FogOfWar.Wrapper.Export do
 
   defp asset_references(_extension, _path, _data), do: []
 
-  @doc "Reject symlinks in a relative asset path before copying from the given root."
-  def reject_symlinks!(root, relative) do
-    if File.lstat!(root).type == :symlink, do: Mix.raise("Do not export a symlinked static root")
+  @doc "Resolve a source file beneath the chosen root, rejecting traversal and symlinks."
+  def checked_source!(root, relative) do
+    relative = Manifest.relative_path!(relative)
+    if File.lstat!(root).type == :symlink, do: Mix.raise("Do not export a symlinked source root")
 
     Enum.reduce(Path.split(relative), root, fn part, parent ->
       path = Path.join(parent, part)

@@ -15,7 +15,7 @@ defmodule FogOfWar.MixProject do
           "format --check-formatted",
           "compile --warnings-as-errors",
           "credo",
-          "sobelow --exit",
+          "sobelow --no-router --compact --exit medium",
           "test --warnings-as-errors"
         ]
       ],

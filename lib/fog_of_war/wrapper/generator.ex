@@ -86,9 +86,8 @@ defmodule FogOfWar.Wrapper.Generator do
       else: desktop!(stage, assigns, manifest)
 
     if icon = manifest["app"]["icon"] do
-      Manifest.relative_path!(icon)
-      Export.reject_symlinks!(root, icon)
-      put!(stage, "branding/source" <> Path.extname(icon), File.read!(Path.join(root, icon)))
+      source = Export.checked_source!(root, icon)
+      put!(stage, "branding/source" <> Path.extname(icon), File.read!(source))
     end
 
     put!(
@@ -157,8 +156,8 @@ defmodule FogOfWar.Wrapper.Generator do
   end
 
   defp read_native_bundle!(source, platform, manifest) do
-    native = source |> Path.join("native.json") |> File.read!() |> Jason.decode!()
-    index = source |> Path.join("index.json") |> File.read!() |> Jason.decode!()
+    native = source |> Export.checked_source!("native.json") |> File.read!() |> Jason.decode!()
+    index = source |> Export.checked_source!("index.json") |> File.read!() |> Jason.decode!()
 
     if !(native["schema"] == 1 && native["platform"] == platform &&
            native["url"] == manifest["web"]["origin"] <> manifest["web"]["start_path"] &&
@@ -179,9 +178,8 @@ defmodule FogOfWar.Wrapper.Generator do
     ]
 
     for file <- Enum.uniq(files) do
-      Manifest.relative_path!(file)
-      Export.reject_symlinks!(source, file)
-      put!(target, file, File.read!(Path.join(source, file)))
+      input = Export.checked_source!(source, file)
+      put!(target, file, File.read!(input))
     end
   end
 

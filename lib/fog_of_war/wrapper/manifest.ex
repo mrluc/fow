@@ -14,8 +14,8 @@ defmodule FogOfWar.Wrapper.Manifest do
     app = config[:app]
     endpoint = discover_endpoint!(app, opts[:endpoint])
     origin = opts[:url] || endpoint_origin(app, endpoint)
-    router = discover_router(endpoint)
-    routes = discover_routes(router)
+    router = endpoint |> inspect() |> String.replace_suffix(".Endpoint", ".Router")
+    routes = discover_routes(existing_module(router))
 
     slug = opts[:slug] || to_string(app)
     static = "priv/static"
@@ -41,7 +41,7 @@ defmodule FogOfWar.Wrapper.Manifest do
         "web" => %{
           "origin" => origin,
           "endpoint" => inspect(endpoint),
-          "router" => inspect(router),
+          "router" => router,
           "discovered_routes" => routes
         },
         "startup" => %{"path" => "/"},
@@ -54,7 +54,9 @@ defmodule FogOfWar.Wrapper.Manifest do
     )
   end
 
-  defp discover_endpoint!(_app, endpoint) when endpoint not in [nil, false], do: Module.concat([endpoint])
+  defp discover_endpoint!(_app, endpoint) when endpoint not in [nil, false] do
+    existing_module(endpoint) || Mix.raise("Unknown Phoenix endpoint #{inspect(endpoint)}")
+  end
 
   defp discover_endpoint!(app, _) do
     app
@@ -81,15 +83,17 @@ defmodule FogOfWar.Wrapper.Manifest do
     "#{scheme}://#{url[:host] || "localhost"}:#{port}"
   end
 
-  defp discover_router(endpoint) do
-    endpoint
-    |> Atom.to_string()
-    |> String.replace_suffix(".Endpoint", ".Router")
-    |> String.to_atom()
+  defp existing_module(name) do
+    module = Module.safe_concat([name])
+    if Code.ensure_loaded?(module), do: module
+  rescue
+    ArgumentError -> nil
   end
 
+  defp discover_routes(nil), do: []
+
   defp discover_routes(router) do
-    if Code.ensure_loaded?(router) && function_exported?(router, :__routes__, 0) do
+    if function_exported?(router, :__routes__, 0) do
       router
       |> Phoenix.Router.routes()
       |> Enum.filter(&(&1.verb == :get))
@@ -133,8 +137,7 @@ defmodule FogOfWar.Wrapper.Manifest do
   end
 
   defp environment_overrides!(profiles, name) do
-    if !(is_binary(name) && Regex.match?(~r/^[A-Za-z0-9][A-Za-z0-9_-]*$/, name)),
-      do: Mix.raise("Environment names must be nonempty letters, digits, underscores or hyphens")
+    validate_environment!(name)
 
     overrides = Map.get(profiles, name)
 
@@ -150,17 +153,29 @@ defmodule FogOfWar.Wrapper.Manifest do
     overrides
   end
 
+  defp validate_environment!(name) do
+    require_match!(
+      name,
+      ~r/^[A-Za-z0-9][A-Za-z0-9_-]*$/,
+      "Environment names must be nonempty letters, digits, underscores or hyphens"
+    )
+
+    name
+  end
+
   defp normalize_profile(%{"schema" => 3} = manifest) do
     start = get_in(manifest, ["startup", "path"])
     preload = get_in(manifest, ["preload", "paths"]) || []
 
     if !is_list(preload), do: Mix.raise("preload.paths must be a list")
 
+    environment = manifest |> Map.get("environment", "default") |> validate_environment!()
+
     public = %{
       "paths" => Enum.uniq([start | preload]),
       "static_root" => get_in(manifest, ["assets", "static_root"]) || "priv/static",
       "asset_directories" => get_in(manifest, ["assets", "directories"]) || ["assets", "css", "fonts", "images"],
-      "bundle" => Path.join([".fow", manifest["environment"] || "default", "bundles", "source"])
+      "bundle" => Path.join([".fow", environment, "bundles", "source"])
     }
 
     manifest

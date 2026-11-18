@@ -16,6 +16,8 @@ jobs:
       - run: mix deps.get && mix format --check-formatted && mix test --warnings-as-errors
       - name: Check Elixir style with strict Credo
         run: mix credo
+      - name: Scan Elixir code with Sobelow
+        run: mix sobelow --no-router --compact --exit medium
       - name: Test Counters (Elixir)
         run: mix deps.get && mix test --warnings-as-errors
         working-directory: examples/basic

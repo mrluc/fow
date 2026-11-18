@@ -80,6 +80,35 @@ defmodule FogOfWar.WrapperTest do
     refute File.exists?(Path.join(root, manifest["public"]["bundle"]))
   end
 
+  test "public assets cannot follow a symlink above the configured static directory", %{
+    root: root,
+    manifest: manifest,
+    html: html
+  } do
+    File.rename!(Path.join(root, "priv"), Path.join(root, "other"))
+    File.ln_s!(Path.join(root, "other"), Path.join(root, "priv"))
+    output = Path.join(root, manifest["public"]["bundle"])
+
+    assert_raise Mix.Error, ~r/symlinked/, fn ->
+      NativeBundle.run!(manifest, root, output, "apple", fetch: fn url -> for_path(html, url) end)
+    end
+
+    refute File.exists?(output)
+  end
+
+  test "environment names are checked before being used as output directories", %{manifest: manifest} do
+    assert Manifest.resolve!(Map.put(manifest, "environment", "android-dev"))["public"]["bundle"] ==
+             ".fow/android-dev/bundles/source"
+
+    assert_raise Mix.Error, ~r/Environment names/, fn ->
+      Manifest.resolve!(Map.put(manifest, "environment", "../android"))
+    end
+
+    assert_raise Mix.Error, ~r/Environment names/, fn ->
+      manifest |> Map.put("envs", %{"../android" => %{}}) |> Manifest.resolve!("../android")
+    end
+  end
+
   test "manifest requires explicit public paths and rejects ambiguous origins or escaping paths",
        %{manifest: manifest, root: root} do
     assert Manifest.validate!(manifest) == manifest
