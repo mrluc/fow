@@ -63,5 +63,7 @@ defmodule FogOfWar.MixProject do
     ]
   end
 
+  def cli, do: [preferred_envs: [check: :test]]
+
   def application, do: [extra_applications: [:logger]]
 end
