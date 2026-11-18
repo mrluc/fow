@@ -31,24 +31,29 @@ defmodule FogOfWar.Wrapper.Output do
       # while generation/building ran.
       validate!(output, opts[:protected] || [])
 
-      if File.exists?(output) do
-        if !opts[:force], do: Mix.raise("Destination appeared during generation: #{output}")
-        File.rename!(output, backup)
-      end
-
-      try do
-        File.rename!(stage, output)
-      rescue
-        error ->
-          if File.exists?(backup), do: File.rename!(backup, output)
-          reraise error, __STACKTRACE__
-      end
-
+      swap!(stage, output, backup, opts[:force])
       File.rm_rf!(backup)
       output
     after
       File.rm_rf(stage)
     end
+  end
+
+  defp swap!(stage, output, backup, force) do
+    if File.exists?(output) do
+      if !force, do: Mix.raise("Destination appeared during generation: #{output}")
+      File.rename!(output, backup)
+    end
+
+    rename_or_restore!(stage, output, backup)
+  end
+
+  defp rename_or_restore!(stage, output, backup) do
+    File.rename!(stage, output)
+  rescue
+    error ->
+      if File.exists?(backup), do: File.rename!(backup, output)
+      reraise error, __STACKTRACE__
   end
 
   @doc "Check a destination against protected paths before writing or replacing it."

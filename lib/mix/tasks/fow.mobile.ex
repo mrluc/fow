@@ -22,6 +22,28 @@ defmodule Mix.Tasks.Fow.Mobile do
   def run(args) do
     Mix.Task.run("app.config")
 
+    opts = parse_args!(args)
+    platform = opts[:platform] || "android"
+    if platform not in ["android", "ios"], do: Mix.raise("--platform must be android or ios")
+    path = Path.expand(opts[:manifest] || ".fow.json")
+    manifest = Manifest.read!(path, opts[:env])
+    root = Path.dirname(path)
+    bundles = Path.join([root, ".fow", manifest["environment"] || "default", "bundles"])
+    project = Workflow.project_path(path, :mob, opts)
+    platforms = get_in(manifest, ["mob", "platforms"]) || ["android", "ios"]
+
+    if platform not in platforms,
+      do: Mix.raise("Selected manifest environment excludes #{platform}")
+
+    Output.validate!(project, [root, bundles])
+    if File.exists?(project) && !opts[:force], do: Mix.raise("Destination exists: #{project}")
+
+    prepare_bundles!(platforms, bundles, manifest, root, project, opts)
+    Generator.run!(:mob, path, project, Keyword.put(opts, :bundle_dir, bundles))
+    deploy!(project, platform, opts[:device])
+  end
+
+  defp parse_args!(args) do
     {opts, rest, invalid} =
       OptionParser.parse(args,
         strict: [
@@ -38,21 +60,10 @@ defmodule Mix.Tasks.Fow.Mobile do
 
     if rest != [] || invalid != [], do: Mix.raise("Invalid mobile arguments")
 
-    platform = opts[:platform] || "android"
-    if platform not in ["android", "ios"], do: Mix.raise("--platform must be android or ios")
-    path = Path.expand(opts[:manifest] || ".fow.json")
-    manifest = Manifest.read!(path, opts[:env])
-    root = Path.dirname(path)
-    bundles = Path.join([root, ".fow", manifest["environment"] || "default", "bundles"])
-    project = Workflow.project_path(path, :mob, opts)
-    platforms = get_in(manifest, ["mob", "platforms"]) || ["android", "ios"]
+    opts
+  end
 
-    if platform not in platforms,
-      do: Mix.raise("Selected manifest environment excludes #{platform}")
-
-    Output.validate!(project, [root, bundles])
-    if File.exists?(project) && !opts[:force], do: Mix.raise("Destination exists: #{project}")
-
+  defp prepare_bundles!(platforms, bundles, manifest, root, project, opts) do
     for selected <- platforms do
       output = Path.join(bundles, selected)
 
@@ -61,9 +72,10 @@ defmodule Mix.Tasks.Fow.Mobile do
         NativeBundle.run!(manifest, root, stage, selected, base_url: opts[:base_url])
       end)
     end
+  end
 
-    Generator.run!(:mob, path, project, Keyword.put(opts, :bundle_dir, bundles))
-    device = if opts[:device], do: ["--device", opts[:device]], else: []
+  defp deploy!(project, platform, serial) do
+    device = if serial, do: ["--device", serial], else: []
 
     {_, status} =
       System.cmd("bash", ["build.sh", "--" <> platform] ++ device,

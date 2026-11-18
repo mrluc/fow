@@ -60,6 +60,37 @@ defmodule FogOfWar.Wrapper.CacheExport do
   def capture!(manifest, path, body, root, opts \\ []) do
     document = Floki.parse_document!(body)
 
+    {region, attrs} = export_region!(document, path)
+    html = Floki.raw_html([region])
+    gzip = :zlib.gzip(html)
+    name = :sha256 |> :crypto.hash(path) |> Base.encode16(case: :lower)
+    file = "pages/#{name}.html.gz"
+    write!(root, file, gzip)
+    if path == manifest["web"]["start_path"], do: write!(root, "startup.html", body)
+
+    if opts[:debug], do: write_debug!(root, name, capture_origin!(manifest, opts) <> path, body, html)
+
+    saved_at = DateTime.utc_now()
+
+    record =
+      %{
+        "schema" => 1,
+        "build" => @build,
+        "path" => path,
+        "regionId" => attrs["id"],
+        "title" => document |> Floki.find("title") |> Floki.text(),
+        "savedAt" => DateTime.to_iso8601(saved_at),
+        "file" => file,
+        "encoding" => "gzip",
+        "compressedBytes" => byte_size(gzip),
+        "htmlBytes" => byte_size(html),
+        "sha256" => :sha256 |> :crypto.hash(gzip) |> Base.encode16(case: :lower)
+      }
+
+    put_expiry!(record, attrs["data-fog-of-war-max-age-ms"], saved_at, path)
+  end
+
+  defp export_region!(document, path) do
     region =
       case Floki.find(document, "[phx-hook=FogOfWar]") do
         [node] ->
@@ -77,60 +108,26 @@ defmodule FogOfWar.Wrapper.CacheExport do
     if attrs["data-fog-of-war-path"] && attrs["data-fog-of-war-path"] != path,
       do: Mix.raise("#{path}: FogOfWar region declares #{inspect(attrs["data-fog-of-war-path"])}")
 
-    html = Floki.raw_html([region])
-    gzip = :zlib.gzip(html)
-    name = :sha256 |> :crypto.hash(path) |> Base.encode16(case: :lower)
-    file = "pages/#{name}.html.gz"
-    write!(root, file, gzip)
-    if path == manifest["web"]["start_path"], do: write!(root, "startup.html", body)
+    {region, attrs}
+  end
 
-    if opts[:debug] do
-      debug = "debug/#{name}"
+  defp write_debug!(root, name, url, body, html) do
+    debug = "debug/#{name}"
+    write!(root, debug <> "/request.json", Jason.encode!(%{method: "GET", url: url}, pretty: true))
+    write!(root, debug <> "/response.html", body)
+    write!(root, debug <> "/region.html", html)
+  end
 
-      write!(
-        root,
-        debug <> "/request.json",
-        Jason.encode!(%{method: "GET", url: capture_origin!(manifest, opts) <> path},
-          pretty: true
-        )
-      )
+  defp put_expiry!(record, nil, _saved_at, _path), do: record
 
-      write!(root, debug <> "/response.html", body)
-      write!(root, debug <> "/region.html", html)
+  defp put_expiry!(record, value, saved_at, path) do
+    case Integer.parse(value) do
+      {ms, ""} when ms > 0 and ms <= 8_000_000_000_000_000 ->
+        Map.put(record, "expiresAt", DateTime.to_unix(saved_at, :millisecond) + ms)
+
+      _ ->
+        Mix.raise("#{path}: invalid FogOfWar max age")
     end
-
-    saved_at = DateTime.utc_now()
-
-    then(
-      %{
-        "schema" => 1,
-        "build" => @build,
-        "path" => path,
-        "regionId" => attrs["id"],
-        "title" => document |> Floki.find("title") |> Floki.text(),
-        "savedAt" => DateTime.to_iso8601(saved_at),
-        "file" => file,
-        "encoding" => "gzip",
-        "compressedBytes" => byte_size(gzip),
-        "htmlBytes" => byte_size(html),
-        "sha256" => :sha256 |> :crypto.hash(gzip) |> Base.encode16(case: :lower)
-      },
-      fn record ->
-        case attrs["data-fog-of-war-max-age-ms"] do
-          nil ->
-            record
-
-          value ->
-            case Integer.parse(value) do
-              {ms, ""} when ms > 0 and ms <= 8_000_000_000_000_000 ->
-                Map.put(record, "expiresAt", DateTime.to_unix(saved_at, :millisecond) + ms)
-
-              _ ->
-                Mix.raise("#{path}: invalid FogOfWar max age")
-            end
-        end
-      end
-    )
   end
 
   @doc "Write the bundle index from the captured route records and return it."

@@ -2,5 +2,7 @@ defmodule Mix.Tasks.Fow.Gen.Elixirkit do
   @moduledoc false
   use Mix.Task
 
-  def run(args), do: Mix.Tasks.Fow.Gen.Desktop.run(args)
+  alias Mix.Tasks.Fow.Gen.Desktop
+
+  def run(args), do: Desktop.run(args)
 end

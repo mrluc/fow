@@ -235,12 +235,12 @@ try do
   if !evaluate.("document.documentElement.classList.contains('fow-offline') && !window.liveSocket.isConnected()"),
     do: raise("Cold launch unexpectedly connected to the website")
 
-  IO.inspect(
+  cold_start =
     evaluate.(
       "({url:location.href,origin:location.origin,offline:document.documentElement.classList.contains('fow-offline'),images:[...document.images].map(i=>({src:i.src,loaded:i.complete&&i.naturalWidth>0})),canvas:!!document.querySelector('canvas.pixel-fog')})"
-    ),
-    label: "COLD START"
-  )
+    )
+
+  IO.puts("COLD START: #{inspect(cold_start)}")
 
   evaluate.(
     "window.fogOfWarStartup.then(result=>window.__bundleResult=result).catch(error=>window.__bundleError=error.message); true"
@@ -248,7 +248,7 @@ try do
 
   wait.("batch import", fn -> evaluate.("!!window.__bundleResult?.complete") end)
   result = evaluate.("window.__bundleResult || window.__bundleError")
-  IO.inspect(result, label: "IMPORT")
+  IO.puts("IMPORT: #{inspect(result)}")
 
   if !match?(%{"complete" => true, "total" => 4, "stored" => 4}, result),
     do: raise("Fresh IndexedDB did not import all four bundled routes")

@@ -18,25 +18,24 @@ defmodule Mix.Tasks.Fow.Install.Mobile do
       do: Mix.raise("Pass --app and optionally --device")
 
     app = Path.expand(opts[:app])
-
-    {tool, arguments} =
-      case Path.extname(app) do
-        ".apk" ->
-          if !File.regular?(app), do: Mix.raise("APK does not exist: #{app}")
-          serial = if opts[:device], do: ["-s", opts[:device]], else: []
-          {"adb", serial ++ ["install", "-r", app]}
-
-        ".app" ->
-          if !File.dir?(app), do: Mix.raise("App does not exist: #{app}")
-          {"xcrun", ["simctl", "install", opts[:device] || "booted", app]}
-
-        _ ->
-          Mix.raise("Expected an Android APK or iOS simulator .app")
-      end
+    {tool, arguments} = install_command!(Path.extname(app), app, opts[:device])
 
     {_, status} =
       System.cmd(tool, arguments, into: IO.stream(:stdio, :line), stderr_to_stdout: true)
 
     if status != 0, do: Mix.raise("#{tool} exited with status #{status}")
   end
+
+  defp install_command!(".apk", app, device) do
+    if !File.regular?(app), do: Mix.raise("APK does not exist: #{app}")
+    serial = if device, do: ["-s", device], else: []
+    {"adb", serial ++ ["install", "-r", app]}
+  end
+
+  defp install_command!(".app", app, device) do
+    if !File.dir?(app), do: Mix.raise("App does not exist: #{app}")
+    {"xcrun", ["simctl", "install", device || "booted", app]}
+  end
+
+  defp install_command!(_, _, _), do: Mix.raise("Expected an Android APK or iOS simulator .app")
 end

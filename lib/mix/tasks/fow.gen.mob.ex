@@ -2,5 +2,7 @@ defmodule Mix.Tasks.Fow.Gen.Mob do
   @moduledoc false
   use Mix.Task
 
-  def run(args), do: Mix.Tasks.Fow.Gen.Mobile.run(args)
+  alias Mix.Tasks.Fow.Gen.Mobile
+
+  def run(args), do: Mobile.run(args)
 end

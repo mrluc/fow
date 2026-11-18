@@ -31,28 +31,28 @@ defmodule FogOfWar.Wrapper.Export do
         :inets.stop(:httpc, profile)
       end
 
-    case result do
-      {:ok, {{_, 200, _}, headers, body}} when byte_size(body) <= 2_000_000 ->
-        type =
-          Enum.find_value(headers, "", fn {k, v} ->
-            if String.downcase(to_string(k)) == "content-type", do: to_string(v)
-          end)
-
-        if !String.starts_with?(type, "text/html"),
-          do: Mix.raise("Expected public HTML from #{url}, got #{type}")
-
-        body
-
-      {:ok, {{_, 200, _}, _, body}} when byte_size(body) > 2_000_000 ->
-        Mix.raise("Public HTML exceeds the 2,000,000-byte per-page limit: #{url}")
-
-      {:ok, {{_, status, _}, _, _}} ->
-        Mix.raise("Public export requires HTTP 200 without redirects: #{url} returned #{status}")
-
-      {:error, reason} ->
-        Mix.raise("Could not export #{url}: #{inspect(reason)}")
-    end
+    public_html!(result, url)
   end
+
+  defp public_html!({:ok, {{_, 200, _}, headers, body}}, url) when byte_size(body) <= 2_000_000 do
+    type =
+      Enum.find_value(headers, "", fn {k, v} ->
+        if String.downcase(to_string(k)) == "content-type", do: to_string(v)
+      end)
+
+    if !String.starts_with?(type, "text/html"),
+      do: Mix.raise("Expected public HTML from #{url}, got #{type}")
+
+    body
+  end
+
+  defp public_html!({:ok, {{_, 200, _}, _, _}}, url),
+    do: Mix.raise("Public HTML exceeds the 2,000,000-byte per-page limit: #{url}")
+
+  defp public_html!({:ok, {{_, status, _}, _, _}}, url),
+    do: Mix.raise("Public export requires HTTP 200 without redirects: #{url} returned #{status}")
+
+  defp public_html!({:error, reason}, url), do: Mix.raise("Could not export #{url}: #{inspect(reason)}")
 
   @doc "Copy eligible local static assets into staging and return their URL-to-file mapping."
   def copy_assets!([], _project, _manifest, _stage, found), do: found
@@ -67,44 +67,48 @@ defmodule FogOfWar.Wrapper.Export do
          String.starts_with?(path, "/_fog/") || Map.has_key?(found, path) do
       copy_assets!(rest, project, manifest, stage, found)
     else
-      path = if String.starts_with?(path, "/"), do: path, else: "/" <> path
-      Manifest.validate_path!(path)
-      relative = URI.decode(String.trim_leading(path, "/"))
-      root = Path.expand(manifest["public"]["static_root"], project)
-      source = Path.join(root, relative)
-
-      allowed =
-        Enum.any?(
-          manifest["public"]["asset_directories"],
-          &String.starts_with?(relative, &1 <> "/")
-        ) || relative == "favicon.ico"
-
-      if !allowed || !File.regular?(source),
-        do: Mix.raise("Missing or disallowed public asset #{path}; adjust public.asset_directories")
-
-      reject_symlinks!(root, relative)
-
-      if map_size(found) > 512 || File.stat!(source).size > 10_000_000,
-        do: Mix.raise("Public asset export limit exceeded")
-
-      target = "assets/" <> relative
-      data = File.read!(source)
-      write!(stage, target, data)
-
-      urls =
-        if Path.extname(path) == ".css" do
-          ~r/(?:url\(\s*|@import\s+(?!url\s*\())["']?([^\s"'\)]+)["']?\s*\)?/
-          |> Regex.scan(data)
-          |> Enum.map(fn [_, ref] -> URI.merge("http://local" <> path, ref) end)
-          |> Enum.filter(&(&1.host == "local"))
-          |> Enum.map(& &1.path)
-        else
-          []
-        end
-
+      {path, target, urls} = copy_asset!(path, project, manifest, stage, found)
       copy_assets!(rest ++ urls, project, manifest, stage, Map.put(found, path, target))
     end
   end
+
+  defp copy_asset!(path, project, manifest, stage, found) do
+    path = if String.starts_with?(path, "/"), do: path, else: "/" <> path
+    Manifest.validate_path!(path)
+    relative = URI.decode(String.trim_leading(path, "/"))
+    root = Path.expand(manifest["public"]["static_root"], project)
+    source = Path.join(root, relative)
+
+    allowed =
+      Enum.any?(
+        manifest["public"]["asset_directories"],
+        &String.starts_with?(relative, &1 <> "/")
+      ) || relative == "favicon.ico"
+
+    if !allowed || !File.regular?(source),
+      do: Mix.raise("Missing or disallowed public asset #{path}; adjust public.asset_directories")
+
+    reject_symlinks!(root, relative)
+
+    if map_size(found) > 512 || File.stat!(source).size > 10_000_000,
+      do: Mix.raise("Public asset export limit exceeded")
+
+    target = "assets/" <> relative
+    data = File.read!(source)
+    write!(stage, target, data)
+
+    {path, target, asset_references(Path.extname(path), path, data)}
+  end
+
+  defp asset_references(".css", path, data) do
+    ~r/(?:url\(\s*|@import\s+(?!url\s*\())["']?([^\s"'\)]+)["']?\s*\)?/
+    |> Regex.scan(data)
+    |> Enum.map(fn [_, ref] -> URI.merge("http://local" <> path, ref) end)
+    |> Enum.filter(&(&1.host == "local"))
+    |> Enum.map(& &1.path)
+  end
+
+  defp asset_references(_extension, _path, _data), do: []
 
   @doc "Reject symlinks in a relative asset path before copying from the given root."
   def reject_symlinks!(root, relative) do

@@ -12,45 +12,10 @@ defmodule FogOfWar.Wrapper.Manifest do
   def discover(opts) do
     config = Mix.Project.config()
     app = config[:app]
-    env = Application.get_all_env(app)
-
-    endpoint =
-      (opts[:endpoint] && Module.concat([opts[:endpoint]])) ||
-        Enum.find_value(env, fn {key, value} ->
-          if is_atom(key) && String.ends_with?(Atom.to_string(key), ".Endpoint") && is_list(value),
-            do: key
-        end)
-
-    if is_nil(endpoint),
-      do: Mix.raise("Cannot infer the Phoenix endpoint; pass --endpoint MyAppWeb.Endpoint")
-
-    endpoint_config = Application.get_env(app, endpoint, [])
-    url = endpoint_config[:url] || []
-    scheme = to_string(url[:scheme] || "http")
-
-    port =
-      url[:port] || get_in(endpoint_config, [:http, :port]) ||
-        if(scheme == "https", do: 443, else: 4000)
-
-    origin = opts[:url] || "#{scheme}://#{url[:host] || "localhost"}:#{port}"
-
-    router =
-      endpoint
-      |> Atom.to_string()
-      |> String.replace_suffix(".Endpoint", ".Router")
-      |> String.to_atom()
-
-    routes =
-      if Code.ensure_loaded?(router) && function_exported?(router, :__routes__, 0) do
-        router
-        |> Phoenix.Router.routes()
-        |> Enum.filter(&(&1.verb == :get))
-        |> Enum.map(& &1.path)
-        |> Enum.uniq()
-        |> Enum.sort()
-      else
-        []
-      end
+    endpoint = discover_endpoint!(app, opts[:endpoint])
+    origin = opts[:url] || endpoint_origin(app, endpoint)
+    router = discover_router(endpoint)
+    routes = discover_routes(router)
 
     slug = opts[:slug] || to_string(app)
     static = "priv/static"
@@ -89,6 +54,53 @@ defmodule FogOfWar.Wrapper.Manifest do
     )
   end
 
+  defp discover_endpoint!(_app, endpoint) when endpoint not in [nil, false], do: Module.concat([endpoint])
+
+  defp discover_endpoint!(app, _) do
+    app
+    |> Application.get_all_env()
+    |> Enum.find_value(fn {key, value} ->
+      if is_atom(key) && is_list(value) && String.ends_with?(Atom.to_string(key), ".Endpoint"),
+        do: key
+    end)
+    |> case do
+      nil -> Mix.raise("Cannot infer the Phoenix endpoint; pass --endpoint MyAppWeb.Endpoint")
+      endpoint -> endpoint
+    end
+  end
+
+  defp endpoint_origin(app, endpoint) do
+    endpoint_config = Application.get_env(app, endpoint, [])
+    url = endpoint_config[:url] || []
+    scheme = to_string(url[:scheme] || "http")
+
+    port =
+      url[:port] || get_in(endpoint_config, [:http, :port]) ||
+        if(scheme == "https", do: 443, else: 4000)
+
+    "#{scheme}://#{url[:host] || "localhost"}:#{port}"
+  end
+
+  defp discover_router(endpoint) do
+    endpoint
+    |> Atom.to_string()
+    |> String.replace_suffix(".Endpoint", ".Router")
+    |> String.to_atom()
+  end
+
+  defp discover_routes(router) do
+    if Code.ensure_loaded?(router) && function_exported?(router, :__routes__, 0) do
+      router
+      |> Phoenix.Router.routes()
+      |> Enum.filter(&(&1.verb == :get))
+      |> Enum.map(& &1.path)
+      |> Enum.uniq()
+      |> Enum.sort()
+    else
+      []
+    end
+  end
+
   @doc "Read a JSON manifest, apply the selected environment and validate the result."
   def read!(path, env \\ nil), do: path |> File.read!() |> Jason.decode!() |> resolve!(env)
 
@@ -106,23 +118,7 @@ defmodule FogOfWar.Wrapper.Manifest do
 
       {:ok, profiles} when is_map(profiles) ->
         name = env || document["default_env"] || "dev"
-
-        if !(is_binary(name) && Regex.match?(~r/^[A-Za-z0-9][A-Za-z0-9_-]*$/, name)),
-          do: Mix.raise("Environment names must be nonempty letters, digits, underscores or hyphens")
-
-        overrides = Map.get(profiles, name)
-
-        if !is_map(overrides),
-          do:
-            Mix.raise(
-              "Unknown or invalid environment #{inspect(name)}; available: #{Enum.join(Map.keys(profiles), ", ")}"
-            )
-
-        if Enum.any?(
-             ["schema", "envs", "default_env", "environment"],
-             &Map.has_key?(overrides, &1)
-           ),
-           do: Mix.raise("Environment overrides cannot replace manifest control fields")
+        overrides = environment_overrides!(profiles, name)
 
         document
         |> Map.drop(["envs", "default_env"])
@@ -134,6 +130,24 @@ defmodule FogOfWar.Wrapper.Manifest do
       _ ->
         Mix.raise("envs must be a map of environment names to override maps")
     end
+  end
+
+  defp environment_overrides!(profiles, name) do
+    if !(is_binary(name) && Regex.match?(~r/^[A-Za-z0-9][A-Za-z0-9_-]*$/, name)),
+      do: Mix.raise("Environment names must be nonempty letters, digits, underscores or hyphens")
+
+    overrides = Map.get(profiles, name)
+
+    if !is_map(overrides),
+      do: Mix.raise("Unknown or invalid environment #{inspect(name)}; available: #{Enum.join(Map.keys(profiles), ", ")}")
+
+    if Enum.any?(
+         ["schema", "envs", "default_env", "environment"],
+         &Map.has_key?(overrides, &1)
+       ),
+       do: Mix.raise("Environment overrides cannot replace manifest control fields")
+
+    overrides
   end
 
   defp normalize_profile(%{"schema" => 3} = manifest) do
@@ -164,6 +178,20 @@ defmodule FogOfWar.Wrapper.Manifest do
   @doc "Validate a resolved manifest and return it with a normalized website origin."
   def validate!(%{"schema" => schema, "app" => app, "web" => web, "public" => public} = manifest)
       when schema == @schema and is_map(app) and is_map(web) and is_map(public) do
+    validate_app!(app)
+    origin = validate_origin!(web["origin"], "web.origin")
+    validate_capture!(manifest["capture"])
+    validate_path!(web["start_path"])
+    validate_public!(public)
+    validate_platforms!(manifest)
+
+    if app["icon"], do: relative_path!(app["icon"])
+    %{manifest | "web" => Map.put(web, "origin", origin)}
+  end
+
+  def validate!(_), do: Mix.raise("Resolved manifest requires schema 3 and app, web, public maps")
+
+  defp validate_app!(app) do
     require_match!(
       app["slug"],
       ~r/^[a-z][a-z0-9_]*$/,
@@ -183,16 +211,17 @@ defmodule FogOfWar.Wrapper.Manifest do
 
     if String.contains?(app["name"], ["/", "\\"]) || Regex.match?(~r/[\x00-\x1F]/, app["name"]),
       do: Mix.raise("app.name must be a display name, without path separators or control characters")
+  end
 
-    origin = validate_origin!(web["origin"], "web.origin")
+  defp validate_capture!(capture) when capture in [nil, false], do: :ok
 
-    if capture = manifest["capture"] do
-      if !is_map(capture), do: Mix.raise("capture must be a map")
-      if capture["origin"], do: validate_origin!(capture["origin"], "capture.origin")
-    end
+  defp validate_capture!(capture) when is_map(capture) do
+    if capture["origin"], do: validate_origin!(capture["origin"], "capture.origin")
+  end
 
-    validate_path!(web["start_path"])
+  defp validate_capture!(_), do: Mix.raise("capture must be a map")
 
+  defp validate_public!(public) do
     if !is_list(public["paths"]),
       do: Mix.raise("public.paths must explicitly list public route paths")
 
@@ -203,6 +232,9 @@ defmodule FogOfWar.Wrapper.Manifest do
       do: Mix.raise("public.asset_directories must be a list")
 
     Enum.each(public["asset_directories"], &relative_path!/1)
+  end
+
+  defp validate_platforms!(manifest) do
     platforms = get_in(manifest, ["mob", "platforms"]) || ["android", "ios"]
 
     if !(platforms != [] && Enum.all?(platforms, &(&1 in ["android", "ios"]))),
@@ -214,27 +246,27 @@ defmodule FogOfWar.Wrapper.Manifest do
       if !(is_integer(value) && value in 240..4096),
         do: Mix.raise("elixirkit.#{key} must be 240..4096")
     end
-
-    if app["icon"], do: relative_path!(app["icon"])
-    %{manifest | "web" => Map.put(web, "origin", origin)}
   end
-
-  def validate!(_), do: Mix.raise("Resolved manifest requires schema 3 and app, web, public maps")
 
   @doc "Validate a website origin used for capture or startup and normalize it."
   def validate_origin!(value, label \\ "origin") do
     if !is_binary(value), do: Mix.raise("#{label} must be an HTTP(S) origin")
     uri = URI.parse(value)
 
-    if !(uri.scheme in ["http", "https"] && is_binary(uri.host) && uri.userinfo == nil &&
-           uri.query == nil && uri.fragment == nil && uri.path in [nil, "", "/"]),
-       do: Mix.raise("#{label} must be an HTTP(S) origin, without credentials or a path")
+    if !origin_uri?(uri),
+      do: Mix.raise("#{label} must be an HTTP(S) origin, without credentials or a path")
 
     if uri.scheme == "http" && uri.host not in ["localhost", "127.0.0.1", "[::1]", "::1"],
       do: Mix.raise("Use HTTPS for non-loopback origins")
 
     URI.to_string(%{uri | path: nil, host: String.downcase(uri.host)})
   end
+
+  defp origin_uri?(%URI{userinfo: nil, query: nil, fragment: nil} = uri) do
+    uri.scheme in ["http", "https"] && is_binary(uri.host) && uri.path in [nil, "", "/"]
+  end
+
+  defp origin_uri?(_), do: false
 
   @doc "Validate a route pathname suitable for public bundle capture."
   def validate_path!(path) do

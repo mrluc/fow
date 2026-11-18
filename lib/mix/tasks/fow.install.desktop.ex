@@ -11,5 +11,7 @@ defmodule Mix.Tasks.Fow.Install.Desktop do
   """
   use Mix.Task
 
-  def run(args), do: Mix.Tasks.Fow.Install.OsxLocal.run(args)
+  alias Mix.Tasks.Fow.Install.OsxLocal
+
+  def run(args), do: OsxLocal.run(args)
 end

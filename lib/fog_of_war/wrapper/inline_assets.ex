@@ -14,88 +14,74 @@ defmodule FogOfWar.Wrapper.InlineAssets do
   Deferred classic scripts are appended to the body in their original order.
   """
   def inline(html, assets, origin, stage) do
-    tree = Floki.parse_document!(html)
+    {tree, deferred} =
+      html
+      |> Floki.parse_document!()
+      |> Floki.traverse_and_update([], &inline_node(&1, &2, assets, origin, stage))
 
-    tree =
-      Floki.traverse_and_update(tree, fn
-        {"script", attrs, _children} = node ->
-          attrs_map = Map.new(attrs)
+    tree |> append_scripts(Enum.reverse(deferred)) |> Floki.raw_html()
+  end
 
-          if attrs_map["src"] do
-            src = attrs_map["src"]
-            url = resolve(src, origin <> "/")
-            same? = same_origin?(url, origin)
+  defp inline_node({"script", attrs, _children} = node, deferred, assets, origin, stage) do
+    case Map.new(attrs) do
+      %{"src" => src} = options when is_binary(src) ->
+        validate_script!(src, options)
+        url = resolve_same_origin!(src, origin <> "/", origin, "external script")
+        content = url.path |> read_asset!(src, assets, stage) |> safe_script()
+        script = {"script", Enum.reject(attrs, fn {key, _} -> key in ["src", "defer"] end), [content]}
+        place_script(script, options["defer"], deferred)
 
-            cond do
-              attrs_map["async"] != nil ->
-                fail("async external script is unsupported: #{src}")
+      _ ->
+        {node, deferred}
+    end
+  end
 
-              attrs_map["type"] in ["module", "importmap"] ->
-                fail("module/importmap script is unsupported: #{src}")
+  defp inline_node({"link", attrs, _children} = node, deferred, assets, origin, stage) do
+    options = Map.new(attrs)
+    href = options["href"]
 
-              attrs_map["type"] not in [nil, "", "text/javascript", "application/javascript"] ->
-                fail("non-classic external script type is unsupported: #{src}")
+    if "stylesheet" in String.split(options["rel"] || "", ~r/\s+/) and href do
+      url = resolve_same_origin!(href, origin <> "/", origin, "stylesheet")
+      css = url.path |> expand_css!(assets, stage, origin, MapSet.new()) |> safe_style()
+      style = {"style", Enum.filter(attrs, fn {key, _} -> key == "media" end), [css]}
+      {style, deferred}
+    else
+      {node, deferred}
+    end
+  end
 
-              not same? ->
-                fail("cross-origin external script is unsupported: #{src}")
+  defp inline_node(node, deferred, _assets, _origin, _stage), do: {node, deferred}
 
-              true ->
-                content = url.path |> read_asset!(src, assets, stage) |> safe_script()
+  defp validate_script!(src, options) do
+    type = options["type"]
 
-                script =
-                  {"script", Enum.reject(attrs, fn {k, _} -> k in ["src", "defer"] end), [content]}
+    cond do
+      options["async"] != nil ->
+        fail("async external script is unsupported: #{src}")
 
-                if attrs_map["defer"] == nil do
-                  script
-                else
-                  Process.put(
-                    {__MODULE__, :deferred},
-                    Process.get({__MODULE__, :deferred}, []) ++ [script]
-                  )
+      type in ["module", "importmap"] ->
+        fail("module/importmap script is unsupported: #{src}")
 
-                  {:comment, " deferred startup script inlined at body end "}
-                end
-            end
-          else
-            node
-          end
+      type not in [nil, "", "text/javascript", "application/javascript"] ->
+        fail("non-classic external script type is unsupported: #{src}")
 
-        {"link", attrs, _children} = node ->
-          attrs_map = Map.new(attrs)
+      true ->
+        :ok
+    end
+  end
 
-          if "stylesheet" in String.split(attrs_map["rel"] || "", ~r/\s+/) and attrs_map["href"] do
-            href = attrs_map["href"]
-            url = resolve(href, origin <> "/")
+  defp place_script(script, nil, deferred), do: {script, deferred}
 
-            if same_origin?(url, origin) do
-              css = url.path |> expand_css!(assets, stage, origin, MapSet.new()) |> safe_style()
-              {"style", Enum.filter(attrs, fn {key, _} -> key == "media" end), [css]}
-            else
-              fail("cross-origin stylesheet is unsupported: #{href}")
-            end
-          else
-            node
-          end
+  defp place_script(script, _defer, deferred),
+    do: {{:comment, " deferred startup script inlined at body end "}, [script | deferred]}
 
-        other ->
-          other
-      end)
+  defp append_scripts(tree, []), do: tree
 
-    scripts = Process.delete({__MODULE__, :deferred}) || []
-
-    tree =
-      if scripts == [] do
-        tree
-      else
-        Floki.traverse_and_update(tree, fn
-          {"body", attrs, children} -> {"body", attrs, children ++ scripts}
-          node -> node
-        end)
-      end
-
-    Floki.raw_html(tree)
-  after
-    Process.delete({__MODULE__, :deferred})
+  defp append_scripts(tree, scripts) do
+    Floki.traverse_and_update(tree, fn
+      {"body", attrs, children} -> {"body", attrs, children ++ scripts}
+      node -> node
+    end)
   end
 
   defp expand_css!(path, assets, stage, origin, seen) do
@@ -112,14 +98,9 @@ defmodule FogOfWar.Wrapper.InlineAssets do
         ~r/@import\s+(?:url\(\s*)?["']?([^\s"')]+)["']?\s*\)?\s*([^;]*);/i,
         css,
         fn _full, ref, media ->
-          url = resolve(ref, origin <> path)
-
-          if same_origin?(url, origin) do
-            imported = expand_css!(url.path, assets, stage, origin, seen)
-            if String.trim(media) == "", do: imported, else: "@media #{media} {#{imported}}"
-          else
-            fail("cross-origin CSS @import is unsupported: #{ref}")
-          end
+          url = resolve_same_origin!(ref, origin <> path, origin, "CSS @import")
+          imported = expand_css!(url.path, assets, stage, origin, seen)
+          if String.trim(media) == "", do: imported, else: "@media #{media} {#{imported}}"
         end
       )
 
@@ -131,17 +112,27 @@ defmodule FogOfWar.Wrapper.InlineAssets do
           full
 
         Map.has_key?(assets, url.path) ->
-          if Path.extname(url.path) in [".ttf", ".otf", ".woff", ".woff2"] do
-            bytes = read_asset!(url.path, ref, assets, stage)
-            "url(\"data:#{MIME.from_path(url.path)};base64,#{Base.encode64(bytes)}\")"
-          else
-            "url(#{quote}#{"fog-of-war-assets://bundle" <> url.path}#{suffix(url)}#{quote})"
-          end
+          css_asset_url(url, quote, ref, assets, stage)
 
         true ->
           fail("CSS resource was not gathered: #{url.path}")
       end
     end)
+  end
+
+  defp css_asset_url(url, quote, ref, assets, stage) do
+    if Path.extname(url.path) in [".ttf", ".otf", ".woff", ".woff2"] do
+      bytes = read_asset!(url.path, ref, assets, stage)
+      "url(\"data:#{MIME.from_path(url.path)};base64,#{Base.encode64(bytes)}\")"
+    else
+      "url(#{quote}fog-of-war-assets://bundle#{url.path}#{suffix(url)}#{quote})"
+    end
+  end
+
+  defp resolve_same_origin!(ref, base, origin, label) do
+    url = resolve(ref, base)
+    if !same_origin?(url, origin), do: fail("cross-origin #{label} is unsupported: #{ref}")
+    url
   end
 
   defp read_asset!(path, label, assets, stage) do

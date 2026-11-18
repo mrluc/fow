@@ -18,33 +18,35 @@ defmodule FogOfWar.Wrapper.Generator do
     manifest = Manifest.read!(manifest_path, opts[:env])
     root = Path.dirname(Path.expand(manifest_path))
 
-    {bundle_path, native_bundles, webview_path} =
-      if target == :mob do
-        native_root =
-          Path.expand(
-            opts[:bundle_dir] || ".fow/#{manifest["environment"] || "default"}/bundles",
-            root
-          )
+    {bundle_path, native_bundles} = native_inputs!(target, manifest, root, opts)
+    {dependency, dependency_path} = webview_dependency!(target, manifest, root, opts)
+    assigns = assigns(target, manifest, native_bundles, dependency)
 
-        native_bundles = read_native_bundles!(native_root, manifest)
-        {dependency, path} = webview_dependency!(manifest, root, opts)
-        {native_root, native_bundles, {dependency, path}}
-      else
-        source =
-          Path.expand(
-            opts[:bundle_dir] || ".fow/#{manifest["environment"] || "default"}/bundles/apple",
-            root
-          )
-
-        native = read_native_bundle!(source, "apple", manifest)
-        {source, [{"apple", source, native}], nil}
+    Output.replace!(
+      output,
+      [force: opts[:force], protected: [root, bundle_path] ++ List.wrap(dependency_path)],
+      fn stage ->
+        write_project!(target, stage, assigns, manifest, native_bundles, root, opts)
       end
+    )
+  end
 
-    {webview_dependency, webview_protected} = webview_path || {nil, nil}
+  defp native_inputs!(target, manifest, root, opts) do
+    bundle_dir = ".fow/#{manifest["environment"] || "default"}/bundles"
+    default = if target == :mob, do: bundle_dir, else: Path.join(bundle_dir, "apple")
+    source = Path.expand(opts[:bundle_dir] || default, root)
+    {source, native_bundles!(target, source, manifest)}
+  end
 
+  defp native_bundles!(:mob, source, manifest), do: read_native_bundles!(source, manifest)
+
+  defp native_bundles!(:elixirkit, source, manifest),
+    do: [{"apple", source, read_native_bundle!(source, "apple", manifest)}]
+
+  defp assigns(target, manifest, native_bundles, dependency) do
     app = manifest["app"]["slug"] <> if(target == :mob, do: "_mobile", else: "_desktop")
 
-    assigns = [
+    [
       app: app,
       module: Macro.camelize(app),
       name: manifest["app"]["name"],
@@ -55,7 +57,7 @@ defmodule FogOfWar.Wrapper.Generator do
       live_json: Jason.encode!(manifest["web"]["origin"] <> manifest["web"]["start_path"]),
       width: get_in(manifest, ["elixirkit", "width"]) || 1060,
       height: get_in(manifest, ["elixirkit", "height"]) || 760,
-      webview_dependency: webview_dependency,
+      webview_dependency: dependency,
       mobile_platforms: get_in(manifest, ["mob", "platforms"]) || ["android", "ios"],
       native_files:
         for(
@@ -64,85 +66,81 @@ defmodule FogOfWar.Wrapper.Generator do
           do: {Jason.encode!(url), Jason.encode!(entry["file"]), Jason.encode!(entry["mime"])}
         )
     ]
-
-    Output.replace!(
-      output,
-      [force: opts[:force], protected: [root, bundle_path] ++ List.wrap(webview_protected)],
-      fn stage ->
-        if target == :mob do
-          scaffold = opts[:scaffold] || (&scaffold_mob!/3)
-          scaffold.(stage, app, manifest)
-
-          for {platform, source, native} <- native_bundles,
-              do:
-                copy_native_bundle!(
-                  source,
-                  Path.join(stage, "priv/fog_of_war/#{platform}"),
-                  native
-                )
-        else
-          [{_, source, native}] = native_bundles
-          copy_native_bundle!(source, Path.join(stage, "priv/fog_of_war/apple"), native)
-        end
-
-        Manifest.write!(Path.join(stage, ".fow.json"), manifest)
-        put!(stage, "mix.exs", mixfile(target, assigns))
-
-        if target == :mob,
-          do: mobile!(stage, assigns, manifest),
-          else: desktop!(stage, assigns, manifest)
-
-        icon = manifest["app"]["icon"]
-
-        if icon do
-          Manifest.relative_path!(icon)
-          Export.reject_symlinks!(root, icon)
-          put!(stage, "branding/source" <> Path.extname(icon), File.read!(Path.join(root, icon)))
-        end
-
-        put!(
-          stage,
-          ".gitignore",
-          "/deps/\n/_build/\n/src-tauri/target/\n/android/.gradle/\n/android/app/build/\n/mob.local.exs\n"
-        )
-
-        put!(stage, "README.md", readme(target, assigns))
-      end
-    )
   end
 
-  defp webview_dependency!(manifest, root, opts) do
+  defp write_project!(target, stage, assigns, manifest, native_bundles, root, opts) do
+    if target == :mob do
+      scaffold = opts[:scaffold] || (&scaffold_mob!/3)
+      scaffold.(stage, assigns[:app], manifest)
+    end
+
+    for {platform, source, native} <- native_bundles do
+      copy_native_bundle!(source, Path.join(stage, "priv/fog_of_war/#{platform}"), native)
+    end
+
+    Manifest.write!(Path.join(stage, ".fow.json"), manifest)
+    put!(stage, "mix.exs", mixfile(target, assigns))
+
+    if target == :mob,
+      do: mobile!(stage, assigns, manifest),
+      else: desktop!(stage, assigns, manifest)
+
+    if icon = manifest["app"]["icon"] do
+      Manifest.relative_path!(icon)
+      Export.reject_symlinks!(root, icon)
+      put!(stage, "branding/source" <> Path.extname(icon), File.read!(Path.join(root, icon)))
+    end
+
+    put!(
+      stage,
+      ".gitignore",
+      "/deps/\n/_build/\n/src-tauri/target/\n/android/.gradle/\n/android/app/build/\n/mob.local.exs\n"
+    )
+
+    put!(stage, "README.md", readme(target, assigns))
+  end
+
+  defp webview_dependency!(:elixirkit, _manifest, _root, _opts), do: {nil, nil}
+
+  defp webview_dependency!(:mob, manifest, root, opts) do
     source = get_in(manifest, ["mob", "webview"]) || %{}
     path = opts[:webview_path] || source["path"] || get_in(manifest, ["mob", "webview_path"])
-    git = opts[:webview_git] || source["git"] || if(!path, do: @mob_webview_git)
-    ref = opts[:webview_ref] || source["ref"] || if(git == @mob_webview_git, do: @mob_webview_ref)
-
-    cond do
-      path && git ->
-        Mix.raise("Choose either a local WebView path or a Git dependency")
-
-      is_binary(path) ->
-        path = Path.expand(path, root)
-
-        if !(File.regular?(Path.join(path, "priv/mob_plugin.exs")) &&
-               File.regular?(Path.join(path, "mix.exs"))),
-           do: Mix.raise("--webview-path must point to the MobWebView package")
-
-        {"{:mob_webview, path: #{inspect(path)}}", path}
-
-      is_binary(git) ->
-        if !(is_binary(ref) && Regex.match?(~r/^[a-fA-F0-9]{40}$/, ref)),
-          do: Mix.raise("--webview-git requires --webview-ref with a full pinned commit SHA")
-
-        if !String.starts_with?(git, ["git@", "ssh://", "https://"]),
-          do: Mix.raise("WebView Git source must be an SSH or HTTPS repository URL")
-
-        {"{:mob_webview, git: #{inspect(git)}, ref: #{inspect(ref)}}", nil}
-
-      true ->
-        Mix.raise("MobWebView is not published yet; pass --webview-path or --webview-git with --webview-ref")
-    end
+    git = opts[:webview_git] || source["git"] || default_webview_git(path)
+    ref = opts[:webview_ref] || source["ref"] || default_webview_ref(git)
+    resolve_webview_dependency!(path, git, ref, root)
   end
+
+  defp default_webview_git(path) when path in [nil, false], do: @mob_webview_git
+  defp default_webview_git(_), do: nil
+
+  defp default_webview_ref(@mob_webview_git), do: @mob_webview_ref
+  defp default_webview_ref(_), do: nil
+
+  defp resolve_webview_dependency!(path, git, _, _) when path not in [nil, false] and git not in [nil, false],
+    do: Mix.raise("Choose either a local WebView path or a Git dependency")
+
+  defp resolve_webview_dependency!(path, _git, _ref, root) when is_binary(path) do
+    path = Path.expand(path, root)
+
+    if !(File.regular?(Path.join(path, "priv/mob_plugin.exs")) &&
+           File.regular?(Path.join(path, "mix.exs"))),
+       do: Mix.raise("--webview-path must point to the MobWebView package")
+
+    {"{:mob_webview, path: #{inspect(path)}}", path}
+  end
+
+  defp resolve_webview_dependency!(_path, git, ref, _root) when is_binary(git) do
+    if !(is_binary(ref) && Regex.match?(~r/^[a-fA-F0-9]{40}$/, ref)),
+      do: Mix.raise("--webview-git requires --webview-ref with a full pinned commit SHA")
+
+    if !String.starts_with?(git, ["git@", "ssh://", "https://"]),
+      do: Mix.raise("WebView Git source must be an SSH or HTTPS repository URL")
+
+    {"{:mob_webview, git: #{inspect(git)}, ref: #{inspect(ref)}}", nil}
+  end
+
+  defp resolve_webview_dependency!(_, _, _, _),
+    do: Mix.raise("MobWebView is not published yet; pass --webview-path or --webview-git with --webview-ref")
 
   defp read_native_bundles!(native_root, manifest) do
     for platform <- get_in(manifest, ["mob", "platforms"]) || ["android", "ios"] do
