@@ -9,7 +9,16 @@ defmodule FogOfWar.MixProject do
       test_ignore_filters: [~r{/native/}],
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      aliases: [credo: "credo --strict"],
+      aliases: [
+        credo: "credo --strict",
+        check: [
+          "format --check-formatted",
+          "compile --warnings-as-errors",
+          "credo",
+          "sobelow --exit",
+          "test --warnings-as-errors"
+        ]
+      ],
       deps: [
         {:phoenix_live_view, "~> 1.2.13"},
         {:jason, "~> 1.4"},
