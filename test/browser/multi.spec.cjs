@@ -11,6 +11,19 @@ const test = base.extend({
 });
 test.use({baseURL: 'http://127.0.0.1:47192', viewport: {width: 640, height: 800}});
 
+async function openPlayableMap(page) {
+  await page.addInitScript(() => {
+    window.addEventListener('phx:frontier:player', ({detail}) => {
+      window.frontierTestCanMove = !detail.clearing_cache && !detail.paused &&
+        !detail.dead && detail.move_remaining_ms === 0;
+    });
+  });
+  await page.goto('/multi/lat/0/lon/0');
+  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
+  // The socket can be online while the fresh join still blocks tile clicks.
+  await page.waitForFunction(() => window.frontierTestCanMove === true);
+}
+
 test('multiplayer streams preserve cached navigation, history, HUD and camera', async ({page}) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -110,8 +123,7 @@ test('server health repairs an old zero-HP prediction and shared tabs follow acc
 
 test('reconnect keeps an explored destination with another tab connected and explicitly paced offline moves', async ({page, context, peacefulGame}) => {
   test.setTimeout(45000);
-  await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
+  await openPlayableMap(page);
   const visit = async path => {
     await page.locator(`a[href="${path}"]`).click();
     await expect(page).toHaveURL(new RegExp(path + '$'));
@@ -157,8 +169,7 @@ test('inspector reset respawns a connected player and clears old cached explorat
 
 
 test('reported journey: reconnect from 0,2 at preloaded 1,0 after 3.8 seconds offline', async ({page, peacefulGame}) => {
-  await page.goto('/multi/lat/0/lon/0');
-  await expect(page.locator('[data-connection-announcement]')).toHaveText('Online');
+  await openPlayableMap(page);
   await page.locator('a[href="/multi/lat/0/lon/1"]').click();
   await expect(page).toHaveURL(/\/multi\/lat\/0\/lon\/1$/);
   await page.waitForTimeout(1100);
